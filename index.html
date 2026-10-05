@@ -26,9 +26,11 @@
 
     /* ===== BASE ===== */
     * { box-sizing:border-box; }
+    [hidden] { display:none !important; }
     body { margin:0; min-height:100vh; color:var(--texto); font:14px 'IBM Plex Mono', ui-monospace, monospace;
            background:radial-gradient(ellipse at 50% 25%, var(--bg2), var(--bg) 70%) fixed; }
-    button { font-family:inherit; cursor:pointer; }
+    button, input { font-family:inherit; }
+    button { cursor:pointer; }
 
     /* efeito CRT (botão "crt" liga/desliga) */
     .crt { position:fixed; inset:0; pointer-events:none; z-index:50;
@@ -65,17 +67,25 @@
     .btn, .chip { border:1px solid var(--borda); border-radius:var(--raio); background:var(--card); color:var(--mudo); }
     .btn { flex:1 1 90px; padding:9px 6px; font-size:13px; display:flex; flex-direction:column; align-items:center; gap:2px; }
     .btn small { font-size:10px; }
-    .btn:hover { border-color:var(--acento); }
+    .btn:hover:not(:disabled) { border-color:var(--acento); }
+    .btn:disabled { opacity:.4; cursor:default; }
     .btn.on { background:var(--c); border-color:var(--c); color:var(--bg); }
     .chip { padding:5px 10px; font-size:11px; background:none; }
     .chip.on { background:var(--acento); border-color:var(--acento); color:var(--bg); }
 
     .card { background:var(--card); border:1px solid var(--borda); border-radius:var(--raio); padding:12px 14px; }
     .card h3 { margin:0 0 8px; font-size:11px; letter-spacing:.1em; font-weight:400; color:var(--mudo); }
+    #tarefa { width:100%; padding:9px 10px; margin-bottom:10px; background:var(--bg); color:var(--texto);
+              border:1px solid var(--borda); border-radius:var(--raio); font-size:13px; }
+    #tarefa:focus { outline:none; border-color:var(--acento); }
     .usar { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
     .usar .btn { flex:none; padding:10px 4px; color:var(--livre); }
     .usar b { font-size:16px; font-weight:500; }
     .usar small { color:var(--mudo); }
+    #resumo, #detalhe { font-size:13px; color:var(--mudo); margin:10px 0; }
+    #nomeTarefa { font-size:15px; }
+    #cron { font:56px/1 'VT323', monospace; filter:var(--fx); margin:6px 0; }
+
     #total { font-size:13px; color:var(--mudo); margin-bottom:8px; }
     #total b { color:var(--texto); font-weight:500; }
     #log { max-height:220px; overflow-y:auto; font-size:13px; }
@@ -109,15 +119,33 @@
     </section>
 
     <aside class="painel">
+      <!-- planejar uma sessão OU acompanhar a que está rodando -->
       <div class="card">
         <h3 id="tituloUsar"></h3>
-        <div class="usar" id="usar"></div>
+
+        <div id="planejar">
+          <input id="tarefa" placeholder="no que vou usar esse tempo?" maxlength="40" autocomplete="off">
+          <div class="usar" id="usar"></div>
+          <div id="resumo"></div>
+          <div class="linhaBtn">
+            <button class="btn" id="comecar">começar</button>
+            <button class="btn" id="zerar">zerar</button>
+          </div>
+        </div>
+
+        <div id="rodando" hidden>
+          <div id="nomeTarefa"></div>
+          <div id="cron"></div>
+          <div id="detalhe"></div>
+          <button class="btn" id="cancelar">cancelar</button>
+        </div>
       </div>
+
       <div class="card">
-        <h3>LOG DE HOJE</h3>
+        <h3>FEITO HOJE</h3>
         <div id="total"></div>
         <div id="log"></div>
-        <button class="fantasma" id="limpar" style="margin-top:8px;font-size:11px">limpar o log de hoje</button>
+        <button class="fantasma" id="limpar" style="margin-top:8px;font-size:11px">limpar o de hoje</button>
       </div>
     </aside>
   </main>
@@ -126,7 +154,7 @@
 /* =====================================================================
    1. CONFIG: o que você mais vai querer mexer
    ===================================================================== */
-const PORCENTAGENS = [1, 5, 10, 20];                          // botões de uso
+const PORCENTAGENS = [1, 5, 10, 20];                          // botões "+%" da sessão
 const TEMAS = { cozy: 'cozy', lain: 'lain', fosforo: 'fósforo' }; // id (CSS) -> nome no botão
 const ROT = -142.5;                                           // -90 = meia-noite no topo
 
@@ -154,6 +182,7 @@ const set = (id, attrs) => { const n = el(id); if (n) for (const k in attrs) n.s
 const rot = h => `rotate(${h * 15} 150 150)`;            // horário -> ângulo (1h = 15°)
 const V = nome => `var(--${nome})`;                      // cor do tema atual
 const jc = i => V('j' + (i % 3));                        // cor da janela i
+const P_ANEL = 2 * Math.PI * 100, P_JANELAS = 2 * Math.PI * 76; // perímetros dos anéis
 
 const ler = (k, padrao) => { try { return JSON.parse(localStorage.getItem(k)) ?? padrao; } catch (e) { return padrao; } };
 const guardar = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
@@ -164,16 +193,23 @@ const durJ = j => mod24(j.fim - j.inicio) || 24;        // duração (aceita cru
 const dentro = (h, ini, fim) => mod24(h - ini) < durJ({ inicio: ini, fim });
 const fmtMin = m => m < 10 ? m.toFixed(1).replace('.', ',') + ' min' : Math.round(m) + ' min';
 const fmtHoras = h => { const m = Math.round(h * 60); return m % 60 ? `${Math.floor(m / 60)}h${pad(m % 60)}` : `${m / 60}h`; };
-const horaAgora = () => { const d = new Date(); return d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600; };
+const horaDe = ms => { const d = new Date(ms); return d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600; };
+const horaAgora = () => horaDe(Date.now());
+const hhmm = ms => new Date(ms).toTimeString().slice(0, 5);
+const fmtCron = ms => { const s = Math.ceil(ms / 1000), h = Math.floor(s / 3600);
+  return `${h ? h + ':' : ''}${pad(Math.floor(s % 3600 / 60))}:${pad(s % 60)}`; };
 
 /* =====================================================================
-   3. ESTADO (tudo que fica salvo no navegador)
+   3. ESTADO (o que fica salvo no navegador)
    ===================================================================== */
 const salvo = ler('relogio-cfg-v2', {});
 const cfg = salvo.tipos || JSON.parse(JSON.stringify(TIPOS_PADRAO));
 let manual = salvo.manual;                                // tipo escolhido na mão (vale só hoje)
 let vis = { tema: 'cozy', crt: true, ...ler('relogio-visual', {}) };
-let log = ler('relogio-log', []);
+let log = ler('relogio-log', []);                         // sessões concluídas
+let sessao = ler('relogio-sessao', null);                 // sessão rodando: { nome, pct, min, ini, fim, base }
+let plano = 0;                                            // % que estou montando antes de começar
+let aviso = '';                                           // mensagem após terminar uma sessão
 
 const dow = new Date().getDay();
 let tipo = (manual?.dia === hoje() && cfg[manual.tipo]) ? manual.tipo : (dow % 6 ? 'trabalho' : 'fimsemana');
@@ -181,6 +217,7 @@ const T = () => cfg[tipo];
 
 const salvarCfg = () => guardar('relogio-cfg-v2', { tipos: cfg, manual });
 const salvarLog = () => guardar('relogio-log', log);
+const salvarSessao = () => guardar('relogio-sessao', sessao);
 
 /* =====================================================================
    4. LÓGICA: o que o relógio está medindo agora?
@@ -215,7 +252,53 @@ function referencia(h) {
 }
 
 /* =====================================================================
-   5. DESENHO
+   5. SESSÃO: "vou usar X% do meu tempo nisso"
+   Monta o plano com os botões +%, começa o timer, o anel mostra o trecho
+   e o fim da sessão registra sozinho em "feito hoje".
+   ===================================================================== */
+function comecar() {
+  if (!plano) return;
+  const min = minP(plano), ini = Date.now();
+  sessao = { nome: el('tarefa').value.trim(), pct: plano, min, ini, fim: ini + min * 60000, base: ref.nome };
+  plano = 0; aviso = ''; el('tarefa').value = '';
+  salvarSessao(); desenharSessao(); atualizar();
+}
+
+function terminar() {
+  const nome = sessao.nome || sessao.base;
+  log.push({ id: Date.now(), quando: new Date().toISOString(), pct: sessao.pct, min: sessao.min, nome, tipo });
+  aviso = `✔ terminou: ${nome} (${sessao.pct}%)`;
+  navigator.vibrate?.([200, 100, 200]);
+  sessao = null;
+  salvarLog(); salvarSessao(); desenharLog(); desenharSessao();
+}
+
+function desenharSessao() {
+  el('planejar').hidden = !!sessao;
+  el('rodando').hidden = !sessao;
+  if (sessao) {
+    el('nomeTarefa').textContent = sessao.nome || 'sessão';
+    el('detalhe').textContent = `${sessao.pct}% de ${sessao.base} · até ${hhmm(sessao.fim)}`;
+  } else {
+    el('comecar').disabled = !plano;
+    el('resumo').textContent = plano
+      ? `${plano}% · ${fmtMin(minP(plano))} · termina às ${hhmm(Date.now() + minP(plano) * 60000)}`
+      : (aviso || 'escolha quanto do seu tempo vai usar');
+  }
+}
+
+// arco no anel das janelas: a sessão (clara), o que já passou (forte) ou o plano (prévia)
+function desenharArcoSessao(h) {
+  let ini = h, dur = plano ? minP(plano) / 60 : 0, feito = 0;
+  if (sessao) { ini = horaDe(sessao.ini); dur = sessao.min / 60; feito = (Date.now() - sessao.ini) / 3600000; }
+  dur = Math.min(dur, 24);
+  arco(P_JANELAS, 'sess', ini, dur);
+  arco(P_JANELAS, 'sessf', ini, Math.min(Math.max(feito, 0), dur));
+  set('sess', { opacity: sessao ? .35 : .55 });
+}
+
+/* =====================================================================
+   6. DESENHO
    ===================================================================== */
 const circ = (r, cor, w, extra = '') =>
   `<circle cx="150" cy="150" r="${r}" fill="none" style="stroke:${cor}" stroke-width="${w}" ${extra}/>`;
@@ -247,7 +330,9 @@ function construir() {
   if (t.trab) s += circ(100, V('trab'), 20, 'id="a-trab"');
   s += circ(76, V('card'), 16)
      + t.janelas.map((j, i) => circ(76, jc(i), 16, `id="j-${i}"`)).join('')
-     + circ(76, V('texto'), 16, 'id="prog"') + '<g id="ticks"></g>'
+     + circ(76, V('texto'), 16, 'id="prog"')
+     + circ(76, V('texto'), 6, 'id="sess"') + circ(76, V('texto'), 6, 'id="sessf"')   // sessão
+     + '<g id="ticks"></g>'
      + `<g id="agora"><line x1="212" y1="150" x2="262" y2="150" style="stroke:var(--acento)" stroke-width="2.5"/>
         <circle cx="250" cy="150" r="7" style="fill:var(--acento)"/></g>`;
 
@@ -270,9 +355,9 @@ function construir() {
 // arcos e alças (roda também durante o arrastar)
 function posicionar() {
   const t = T();
-  arco(100 * 2 * Math.PI, 'a-sono', t.sono.dormir, durJ({ inicio: t.sono.dormir, fim: t.sono.acordar }));
-  if (t.trab) arco(100 * 2 * Math.PI, 'a-trab', t.trab.inicio, durJ(t.trab));
-  t.janelas.forEach((j, i) => { arco(76 * 2 * Math.PI, 'j-' + i, j.inicio, durJ(j)); set('j-' + i, { opacity: j.on ? .4 : .1 }); });
+  arco(P_ANEL, 'a-sono', t.sono.dormir, durJ({ inicio: t.sono.dormir, fim: t.sono.acordar }));
+  if (t.trab) arco(P_ANEL, 'a-trab', t.trab.inicio, durJ(t.trab));
+  t.janelas.forEach((j, i) => { arco(P_JANELAS, 'j-' + i, j.inicio, durJ(j)); set('j-' + i, { opacity: j.on ? .4 : .1 }); });
   document.querySelectorAll('.alca').forEach(a => a.setAttribute('transform', rot(alvoDaAlca(a)[a.dataset.c])));
 }
 
@@ -282,9 +367,10 @@ function desenharRef() {
   el('ticks').innerHTML = !ref.janela ? '' : Array.from({ length: 11 }, (_, i) =>
     `<line x1="214" y1="150" x2="236" y2="150" style="stroke:var(--bg)" stroke-width="${i % 5 ? 1.2 : 2.5}"
       transform="${rot(ref.inicio + ref.dur * i / 10)}"/>`).join('');
-  el('tituloUsar').textContent = `USEI DE: ${ref.nome.toUpperCase()} (${fmtHoras(ref.dur)})`;
+  el('tituloUsar').textContent = `VOU USAR: ${ref.nome.toUpperCase()} (${fmtHoras(ref.dur)})`;
   el('usar').innerHTML = PORCENTAGENS.map(p =>
-    `<button class="btn" data-p="${p}"><b>${p}%</b><small>${fmtMin(minP(p))}</small></button>`).join('');
+    `<button class="btn" data-p="${p}"><b>+${p}%</b><small>${fmtMin(minP(p))}</small></button>`).join('');
+  desenharSessao();
 }
 
 function desenharLog() {
@@ -293,7 +379,7 @@ function desenharLog() {
   doDia.forEach(x => porNome[x.nome] = (porNome[x.nome] || 0) + x.pct);
   el('total').innerHTML = doDia.length
     ? `Total <b>${fmtMin(doDia.reduce((s, x) => s + x.min, 0))}</b>` + Object.entries(porNome).map(([n, p]) => ` · ${n} <b>${p}%</b>`).join('')
-    : 'nada registrado ainda.';
+    : 'nada concluído ainda.';
   el('log').innerHTML = doDia.slice().reverse().map(x => {
     const d = new Date(x.quando);
     return `<div class="item"><span>${pad(d.getHours())}:${pad(d.getMinutes())} · ${x.nome}</span>
@@ -310,23 +396,31 @@ function aplicarVisual() {
   guardar('relogio-visual', vis);
 }
 
-// roda todo segundo: ponteiro, porcentagem e hora
+// roda todo segundo: ponteiro, porcentagem, hora e timer
 function atualizar() {
   const h = horaAgora();
   ref = referencia(h);
   if (ref.chave !== ultimaChave) { ultimaChave = ref.chave; desenharRef(); }
 
-  const feito = ref.janela ? Math.min(Math.max(ref.passou, 0), ref.dur) / 24 * 76 * 2 * Math.PI : 0;
-  set('prog', { 'stroke-dasharray': `${feito} 999`, 'stroke-dashoffset': ref.janela ? -ref.inicio / 24 * 76 * 2 * Math.PI : 0 });
+  if (sessao && Date.now() >= sessao.fim) terminar();      // acabou (inclusive se a aba ficou fechada)
+
+  const feito = ref.janela ? Math.min(Math.max(ref.passou, 0), ref.dur) / 24 * P_JANELAS : 0;
+  set('prog', { 'stroke-dasharray': `${feito} 999`, 'stroke-dashoffset': ref.janela ? -ref.inicio / 24 * P_JANELAS : 0 });
+  desenharArcoSessao(h);
   set('agora', { transform: rot(h) });
+
   el('pct').textContent = ref.pct + '%';
   el('l1').textContent = ref.l1;
   el('l2').textContent = ref.l2;
   el('hora').textContent = new Date().toLocaleTimeString('pt-BR');
+
+  if (sessao) el('cron').textContent = fmtCron(sessao.fim - Date.now());
+  else if (plano) desenharSessao();                        // atualiza o "termina às"
+  document.title = sessao ? `${fmtCron(sessao.fim - Date.now())} · ${sessao.nome || sessao.base}` : 'Relógio de Porcentagem';
 }
 
 /* =====================================================================
-   6. INTERAÇÃO
+   7. INTERAÇÃO
    ===================================================================== */
 function horarioDoPonteiro(e) {
   const r = el('grupo').ownerSVGElement.getBoundingClientRect();
@@ -350,21 +444,21 @@ const aoClicar = (id, acao) => el(id).addEventListener('click', e => { const b =
 aoClicar('temas',   b => { b.dataset.t ? vis.tema = b.dataset.t : vis.crt = !vis.crt; aplicarVisual(); });
 aoClicar('tipos',   b => { tipo = b.dataset.k; manual = { dia: hoje(), tipo }; refazer(); });
 aoClicar('toggles', b => { const j = T().janelas[+b.dataset.i]; j.on = !j.on; refazer(); });
-aoClicar('usar',    b => {
-  const p = +b.dataset.p, agora = new Date();
-  log.push({ id: agora.getTime(), quando: agora.toISOString(), pct: p, min: minP(p), nome: ref.nome, tipo });
-  salvarLog(); desenharLog();
-});
+aoClicar('usar',    b => { plano += +b.dataset.p; aviso = ''; desenharSessao(); });
 aoClicar('log',     b => { log = log.filter(x => x.id !== +b.dataset.id); salvarLog(); desenharLog(); });
-el('limpar').onclick = () => { log = log.filter(x => chaveDia(new Date(x.quando)) !== hoje()); salvarLog(); desenharLog(); };
+el('comecar').onclick  = comecar;
+el('zerar').onclick    = () => { plano = 0; aviso = ''; desenharSessao(); };
+el('cancelar').onclick = () => { sessao = null; salvarSessao(); desenharSessao(); atualizar(); };
+el('limpar').onclick   = () => { log = log.filter(x => chaveDia(new Date(x.quando)) !== hoje()); salvarLog(); desenharLog(); };
 
 /* =====================================================================
-   7. INÍCIO
+   8. INÍCIO
    ===================================================================== */
 aplicarVisual();
 construir();
 desenharLog();
 atualizar();
+desenharSessao();
 setInterval(atualizar, 1000);
 </script>
 </body>
