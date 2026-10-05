@@ -4,142 +4,93 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Relógio de Porcentagem</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=VT323&display=swap" rel="stylesheet">
   <style>
-    /* ============ TEMAS ============ */
-    /* cozy (padrão) */
-    :root {
-      --bg:#17130f; --bg2:#241d16; --card:#211b15; --borda:#3a2f25;
-      --texto:#eadfca; --mudo:#9a8b78; --trilho:#2a221a;
-      --livre:#8fbf8a; --sono:#6f8fd1; --trab:#7d7468;
-      --j0:#e3b261; --j1:#c79ad0; --j2:#6fc3b8;
-      --acento:#e3b261; --glow:rgba(227,178,97,.45);
-      --raio:14px; --scan:.10; --vig:.38;
-      --pctfx:drop-shadow(0 0 5px var(--glow));
+    /* ===== TEMAS: para criar um novo, copie um bloco e registre em TEMAS no JS ===== */
+    :root { /* cozy (padrão) */
+      --bg:#17130f; --bg2:#241d16; --card:#211b15; --borda:#3a2f25; --texto:#eadfca; --mudo:#9a8b78;
+      --livre:#8fbf8a; --sono:#6f8fd1; --trab:#7d7468; --j0:#e3b261; --j1:#c79ad0; --j2:#6fc3b8;
+      --acento:#e3b261; --raio:14px; --scan:.10; --vig:.38; --fx:drop-shadow(0 0 5px #e3b26166);
     }
-    /* lain */
     html[data-tema="lain"] {
-      --bg:#0a0d0e; --bg2:#141b1d; --card:#10161a; --borda:#26323a;
-      --texto:#cfe3dc; --mudo:#6f8a86; --trilho:#141b1d;
-      --livre:#6fd6a0; --sono:#5a7fe0; --trab:#5b6770;
-      --j0:#d9a441; --j1:#b58be0; --j2:#4fd1c5;
-      --acento:#e0413a; --glow:rgba(224,65,58,.5);
-      --raio:3px; --scan:.24; --vig:.6;
-      --pctfx:drop-shadow(1.5px 0 0 rgba(255,40,80,.55)) drop-shadow(-1.5px 0 0 rgba(0,220,255,.5)) drop-shadow(0 0 5px var(--glow));
+      --bg:#0a0d0e; --bg2:#141b1d; --card:#10161a; --borda:#26323a; --texto:#cfe3dc; --mudo:#6f8a86;
+      --livre:#6fd6a0; --sono:#5a7fe0; --trab:#5b6770; --j0:#d9a441; --j1:#b58be0; --j2:#4fd1c5;
+      --acento:#e0413a; --raio:3px; --scan:.24; --vig:.6;
+      --fx:drop-shadow(1.5px 0 0 #ff285088) drop-shadow(-1.5px 0 0 #00dcff80) drop-shadow(0 0 5px #e0413a80);
     }
-    /* fósforo (terminal verde) */
     html[data-tema="fosforo"] {
-      --bg:#040904; --bg2:#0a160a; --card:#081208; --borda:#1b3a1b;
-      --texto:#a5ffa8; --mudo:#4f9a54; --trilho:#0c180c;
-      --livre:#39ff6a; --sono:#3fb4ff; --trab:#3a6b3d;
-      --j0:#d7ff5a; --j1:#ffb454; --j2:#5affd0;
-      --acento:#a5ffa8; --glow:rgba(57,255,106,.55);
-      --raio:0px; --scan:.3; --vig:.6;
-      --pctfx:drop-shadow(0 0 6px var(--glow));
+      --bg:#040904; --bg2:#0a160a; --card:#081208; --borda:#1b3a1b; --texto:#a5ffa8; --mudo:#4f9a54;
+      --livre:#39ff6a; --sono:#3fb4ff; --trab:#3a6b3d; --j0:#d7ff5a; --j1:#ffb454; --j2:#5affd0;
+      --acento:#a5ffa8; --raio:0px; --scan:.3; --vig:.6; --fx:drop-shadow(0 0 6px #39ff6a8c);
     }
 
-    /* ============ BASE ============ */
+    /* ===== BASE ===== */
     * { box-sizing:border-box; }
-    body { margin:0; min-height:100vh; color:var(--texto);
-           font-family:'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace; font-size:14px;
-           background:radial-gradient(ellipse at 50% 25%, var(--bg2) 0%, var(--bg) 70%) fixed;
-           padding-bottom:env(safe-area-inset-bottom); }
+    body { margin:0; min-height:100vh; color:var(--texto); font:14px 'IBM Plex Mono', ui-monospace, monospace;
+           background:radial-gradient(ellipse at 50% 25%, var(--bg2), var(--bg) 70%) fixed; }
     button { font-family:inherit; cursor:pointer; }
 
-    /* efeito CRT: scanlines + vinheta + grão */
+    /* efeito CRT (botão "crt" liga/desliga) */
     .crt { position:fixed; inset:0; pointer-events:none; z-index:50;
-           background:
-             repeating-linear-gradient(to bottom, rgba(0,0,0,var(--scan)) 0 1px, transparent 1px 3px),
-             radial-gradient(ellipse at center, transparent 58%, rgba(0,0,0,var(--vig)) 100%); }
-    .crt::after { content:''; position:absolute; inset:0; opacity:.07; mix-blend-mode:overlay;
-      background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); }
+           background:repeating-linear-gradient(rgba(0,0,0,var(--scan)) 0 1px, transparent 1px 3px),
+                      radial-gradient(ellipse at center, transparent 58%, rgba(0,0,0,var(--vig))); }
     html.sem-crt .crt { display:none; }
 
-    /* ============ LAYOUT ============ */
-    .topo { max-width:1200px; margin:0 auto; padding:14px 16px 0; display:flex; flex-wrap:wrap;
-            gap:10px; justify-content:space-between; align-items:center; }
-    .marca { letter-spacing:.16em; font-size:11px; color:var(--mudo); }
-    .marca b { color:var(--acento); font-weight:500; }
-    .chips { display:flex; gap:6px; flex-wrap:wrap; }
-    .chip { padding:5px 10px; font-size:11px; letter-spacing:.06em; background:transparent; color:var(--mudo);
-            border:1px solid var(--borda); border-radius:var(--raio); }
-    .chip.on { color:var(--bg); background:var(--acento); border-color:var(--acento); }
-
-    .app { max-width:1200px; margin:0 auto; padding:16px; display:grid;
-           grid-template-columns:minmax(0,1fr) minmax(300px,400px); gap:24px; align-items:start; }
-    .relogio { position:sticky; top:12px; display:flex; flex-direction:column; align-items:center; gap:12px; }
-    svg { width:100%; height:auto; max-height:calc(100vh - 250px); touch-action:none; }
-    .painel { display:flex; flex-direction:column; gap:14px; min-width:0; }
-    .rodape { text-align:center; font-size:11px; letter-spacing:.2em; color:var(--mudo); padding:8px 16px 24px; opacity:.7; }
-
+    /* ===== LAYOUT: 2 colunas no desktop, 1 no mobile ===== */
+    .topo, .app { max-width:1100px; margin:0 auto; padding:14px 16px; }
+    .topo { display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; align-items:center;
+            font-size:11px; letter-spacing:.16em; color:var(--mudo); }
+    .topo b { color:var(--acento); font-weight:500; }
+    .app { display:grid; grid-template-columns:minmax(0,1fr) minmax(300px,380px); gap:24px; align-items:start; }
+    .relogio { position:sticky; top:12px; display:flex; flex-direction:column; align-items:center; gap:10px; }
+    .painel { display:flex; flex-direction:column; gap:14px; }
+    svg { width:100%; height:auto; max-height:calc(100vh - 230px); touch-action:none; }
     @media (max-width:860px) {
       .app { grid-template-columns:1fr; gap:16px; }
       .relogio { position:static; }
       svg { max-height:none; max-width:540px; }
     }
-    /* telas de toque: alças maiores */
-    @media (pointer:coarse) { .alca { r:14px; } .alca.pj { r:11px; } }
+    @media (pointer:coarse) { .alca { r:14px; } .alca.pj { r:11px; } } /* alças maiores no toque */
 
-    /* ============ RELÓGIO (SVG) ============ */
+    /* ===== RELÓGIO (SVG) ===== */
     .alca { cursor:grab; stroke:var(--bg); stroke-width:3; }
     .num { fill:var(--mudo); font-size:9px; }
     .num.forte { fill:var(--texto); font-size:11px; font-weight:bold; }
-    .kana { fill:var(--mudo); font-size:9px; letter-spacing:.3em; }
-    #pct { fill:var(--texto); font-family:'VT323', ui-monospace, monospace; font-size:46px; filter:var(--pctfx); }
-    #rotulo { fill:var(--mudo); font-size:8.5px; }
+    .centro { fill:var(--mudo); font-size:8.5px; }
+    #pct { fill:var(--texto); font:46px 'VT323', monospace; filter:var(--fx); }
     #hora { fill:var(--texto); font-size:14px; font-variant-numeric:tabular-nums; }
 
-    @media (prefers-reduced-motion:no-preference) {
-      html[data-tema="lain"] #pct { animation:glitch 7s infinite steps(1); }
-      @keyframes glitch { 0%,92%,100% { transform:translate(0,0); } 93% { transform:translate(2px,0); } 95% { transform:translate(-2px,1px); } 97% { transform:translate(1px,-1px); } }
-      .crt { animation:cintila 5s infinite steps(1); }
-      @keyframes cintila { 0%,100% { opacity:1; } 50% { opacity:.94; } 52% { opacity:1; } }
-    }
-
-    /* ============ BOTÕES E CARDS ============ */
-    .btn { padding:9px 6px; border:1px solid var(--borda); border-radius:var(--raio); background:var(--card);
-           color:var(--mudo); font-size:13px; display:flex; flex-direction:column; gap:2px; align-items:center;
-           flex:1 1 90px; }
-    .btn small { font-size:10px; opacity:.85; }
-    .btn:hover { border-color:var(--acento); }
-    .btn.on { background:var(--c); color:var(--bg); border-color:var(--c); }
+    /* ===== BOTÕES E CARDS ===== */
     .linhaBtn { display:flex; flex-wrap:wrap; gap:8px; width:100%; }
-    .rotuloBtn { font-size:10px; letter-spacing:.14em; color:var(--mudo); align-self:flex-start; margin-bottom:-6px; }
+    .btn, .chip { border:1px solid var(--borda); border-radius:var(--raio); background:var(--card); color:var(--mudo); }
+    .btn { flex:1 1 90px; padding:9px 6px; font-size:13px; display:flex; flex-direction:column; align-items:center; gap:2px; }
+    .btn small { font-size:10px; }
+    .btn:hover { border-color:var(--acento); }
+    .btn.on { background:var(--c); border-color:var(--c); color:var(--bg); }
+    .chip { padding:5px 10px; font-size:11px; background:none; }
+    .chip.on { background:var(--acento); border-color:var(--acento); color:var(--bg); }
 
     .card { background:var(--card); border:1px solid var(--borda); border-radius:var(--raio); padding:12px 14px; }
-    .card h3 { margin:0 0 8px; font-size:11px; letter-spacing:.1em; color:var(--mudo); font-weight:400; }
-    .linha { display:flex; justify-content:space-between; padding:3px 0; font-size:17px; }
-    .linha span:first-child { color:var(--mudo); }
-    .legenda { display:flex; flex-wrap:wrap; gap:6px 14px; font-size:12px; color:var(--mudo); }
-    .legenda i { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:6px; }
-
+    .card h3 { margin:0 0 8px; font-size:11px; letter-spacing:.1em; font-weight:400; color:var(--mudo); }
     .usar { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
-    .usar .btn { padding:10px 4px; color:var(--livre); flex:none; }
-    .usar .btn:active { background:var(--trilho); }
+    .usar .btn { flex:none; padding:10px 4px; color:var(--livre); }
     .usar b { font-size:16px; font-weight:500; }
     .usar small { color:var(--mudo); }
-
-    .total { font-size:13px; color:var(--mudo); margin-bottom:8px; }
-    .total b { color:var(--texto); font-weight:500; }
-    #log { max-height:220px; overflow-y:auto; }
-    .item { display:flex; justify-content:space-between; align-items:center; padding:5px 0;
-            font-size:13px; border-top:1px solid var(--borda); }
-    .item .hora { color:var(--mudo); font-variant-numeric:tabular-nums; }
-    .item button, #limpar { background:none; border:none; color:var(--mudo); padding:0; }
-    .item button { font-size:16px; }
-    #limpar { margin-top:8px; font-size:11px; }
-    .item button:hover, #limpar:hover { color:var(--acento); }
-    .vazio { color:var(--mudo); font-size:12px; }
+    #total { font-size:13px; color:var(--mudo); margin-bottom:8px; }
+    #total b { color:var(--texto); font-weight:500; }
+    #log { max-height:220px; overflow-y:auto; font-size:13px; }
+    .item { display:flex; justify-content:space-between; padding:5px 0; border-top:1px solid var(--borda); }
+    .item span { color:var(--mudo); }
+    .fantasma { background:none; border:none; padding:0; color:var(--mudo); }
+    .fantasma:hover { color:var(--acento); }
   </style>
 </head>
 <body>
   <div class="crt"></div>
 
   <header class="topo">
-    <span class="marca">wired <b>//</b> relógio de porcentagem</span>
-    <div class="chips" id="temas"></div>
+    <span>wired <b>//</b> relógio de porcentagem</span>
+    <div class="linhaBtn" id="temas" style="width:auto"></div>
   </header>
 
   <main class="app">
@@ -147,377 +98,274 @@
       <svg viewBox="-10 -10 320 320">
         <g id="grupo"></g>
         <g id="numeros"></g>
-        <text class="kana" x="150" y="114" text-anchor="middle">時間</text>
+        <text class="centro" x="150" y="114" text-anchor="middle" letter-spacing="3">時間</text>
         <text id="pct" x="150" y="142" text-anchor="middle" dominant-baseline="middle"></text>
-        <text id="rotulo" x="150" y="160" text-anchor="middle"></text>
+        <text id="l1" class="centro" x="150" y="159" text-anchor="middle"></text>
+        <text id="l2" class="centro" x="150" y="169" text-anchor="middle"></text>
         <text id="hora" x="150" y="186" text-anchor="middle"></text>
       </svg>
-
-      <span class="rotuloBtn">TIPO DE DIA</span>
       <div class="linhaBtn" id="tipos"></div>
-      <span class="rotuloBtn">JANELAS (LIGA / DESLIGA)</span>
       <div class="linhaBtn" id="toggles"></div>
     </section>
 
     <aside class="painel">
-      <div class="legenda" id="legenda"></div>
-
-      <div class="card">
-        <h3 id="tituloContador"></h3>
-        <div id="contador"></div>
-      </div>
-
       <div class="card">
         <h3 id="tituloUsar"></h3>
         <div class="usar" id="usar"></div>
       </div>
-
       <div class="card">
         <h3>LOG DE HOJE</h3>
-        <div class="total" id="total"></div>
+        <div id="total"></div>
         <div id="log"></div>
-        <button id="limpar">limpar o log de hoje</button>
+        <button class="fantasma" id="limpar" style="margin-top:8px;font-size:11px">limpar o log de hoje</button>
       </div>
     </aside>
   </main>
 
-  <div class="rodape">present day, present time</div>
-
 <script>
-  /* ================= BÁSICO ================= */
-  const C = 2 * Math.PI * 100;   // anel externo (dia)
-  const CJ = 2 * Math.PI * 76;   // anel interno (janelas)
-  const ROT = -142.5;            // -90 = meia-noite no topo
-  const TESTE = null;            // número (ex.: 19.5) pra simular o horário
+/* =====================================================================
+   1. CONFIG: o que você mais vai querer mexer
+   ===================================================================== */
+const PORCENTAGENS = [1, 5, 10, 20];                          // botões de uso
+const TEMAS = { cozy: 'cozy', lain: 'lain', fosforo: 'fósforo' }; // id (CSS) -> nome no botão
+const ROT = -142.5;                                           // -90 = meia-noite no topo
 
-  const el = id => document.getElementById(id);
-  const svg = document.querySelector('svg');
-  const mod24 = x => (x % 24 + 24) % 24;
-  const pad = n => String(n).padStart(2, '0');
-  const set = (id, attrs) => { const n = el(id); if (n) for (const k in attrs) n.setAttribute(k, attrs[k]); };
-  const rot = h => `rotate(${h * 15} 150 150)`;
-  const V = nome => `var(--${nome})`;      // cor do tema atual
-  const jc = i => V('j' + (i % 3));        // cor da janela i
+// Tipos de dia. Para criar outro, copie um bloco. Tudo é arrastável no anel.
+// sono e trab são { dormir, acordar } e { inicio, fim }; trab: null = sem trabalho.
+const TIPOS_PADRAO = {
+  trabalho: { nome: 'Trabalho', sono: { dormir: 23, acordar: 6 }, trab: { inicio: 10, fim: 17 },
+    janelas: [
+      { id: 'manha', nome: 'Manhã',              inicio: 7,  fim: 10, on: true },
+      { id: 'tarde', nome: 'Depois do trabalho', inicio: 17, fim: 22, on: true },
+    ] },
+  fimsemana: { nome: 'Fim de semana', sono: { dormir: 0, acordar: 9 }, trab: null,
+    janelas: [{ id: 'dia', nome: 'Dia livre', inicio: 9, fim: 24, on: true }] },
+  livre: { nome: 'Folga', sono: { dormir: 23, acordar: 7 }, trab: null,
+    janelas: [{ id: 'dia', nome: 'Dia livre', inicio: 7, fim: 23, on: true }] },
+};
 
-  const ler = (k, padrao) => { try { return JSON.parse(localStorage.getItem(k)) ?? padrao; } catch (e) { return padrao; } };
-  const guardar = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+/* =====================================================================
+   2. UTILITÁRIOS
+   ===================================================================== */
+const el = id => document.getElementById(id);
+const mod24 = x => (x % 24 + 24) % 24;
+const pad = n => String(n).padStart(2, '0');
+const set = (id, attrs) => { const n = el(id); if (n) for (const k in attrs) n.setAttribute(k, attrs[k]); };
+const rot = h => `rotate(${h * 15} 150 150)`;            // horário -> ângulo (1h = 15°)
+const V = nome => `var(--${nome})`;                      // cor do tema atual
+const jc = i => V('j' + (i % 3));                        // cor da janela i
 
-  const chaveDia = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  const hojeStr = () => chaveDia(new Date());
-  const durJ = j => mod24(j.fim - j.inicio) || 24;
-  const dentro = (h, ini, fim) => mod24(h - ini) < (mod24(fim - ini) || 24);
-  const fmtMin = m => m < 10 ? m.toFixed(1).replace('.', ',') + ' min' : Math.round(m) + ' min';
-  const fmtHoras = h => {
-    const m = Math.round(h * 60);
-    return m % 60 === 0 ? (m / 60) + 'h' : Math.floor(m / 60) + 'h' + pad(m % 60);
-  };
-  const horaAgora = () => {
-    const d = new Date();
-    return TESTE ?? (d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600);
-  };
+const ler = (k, padrao) => { try { return JSON.parse(localStorage.getItem(k)) ?? padrao; } catch (e) { return padrao; } };
+const guardar = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
 
-  /* ================= VISUAL (tema + CRT) ================= */
-  const TEMAS = { cozy: 'cozy', lain: 'lain', fosforo: 'fósforo' };
-  const CHAVE_VIS = 'relogio-visual';
-  let vis = { tema: 'cozy', crt: true, ...ler(CHAVE_VIS, {}) };
-  if (!TEMAS[vis.tema]) vis.tema = 'cozy';
+const chaveDia = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const hoje = () => chaveDia(new Date());
+const durJ = j => mod24(j.fim - j.inicio) || 24;        // duração (aceita cruzar a meia-noite)
+const dentro = (h, ini, fim) => mod24(h - ini) < durJ({ inicio: ini, fim });
+const fmtMin = m => m < 10 ? m.toFixed(1).replace('.', ',') + ' min' : Math.round(m) + ' min';
+const fmtHoras = h => { const m = Math.round(h * 60); return m % 60 ? `${Math.floor(m / 60)}h${pad(m % 60)}` : `${m / 60}h`; };
+const horaAgora = () => { const d = new Date(); return d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600; };
 
-  function aplicarVisual() {
-    document.documentElement.dataset.tema = vis.tema;
-    document.documentElement.classList.toggle('sem-crt', !vis.crt);
-    el('temas').innerHTML =
-      Object.keys(TEMAS).map(k => `<button class="chip${k === vis.tema ? ' on' : ''}" data-t="${k}">${TEMAS[k]}</button>`).join('')
-      + `<button class="chip${vis.crt ? ' on' : ''}" data-crt="1">crt</button>`;
-    guardar(CHAVE_VIS, vis);
+/* =====================================================================
+   3. ESTADO (tudo que fica salvo no navegador)
+   ===================================================================== */
+const salvo = ler('relogio-cfg-v2', {});
+const cfg = salvo.tipos || JSON.parse(JSON.stringify(TIPOS_PADRAO));
+let manual = salvo.manual;                                // tipo escolhido na mão (vale só hoje)
+let vis = { tema: 'cozy', crt: true, ...ler('relogio-visual', {}) };
+let log = ler('relogio-log', []);
+
+const dow = new Date().getDay();
+let tipo = (manual?.dia === hoje() && cfg[manual.tipo]) ? manual.tipo : (dow % 6 ? 'trabalho' : 'fimsemana');
+const T = () => cfg[tipo];
+
+const salvarCfg = () => guardar('relogio-cfg-v2', { tipos: cfg, manual });
+const salvarLog = () => guardar('relogio-log', log);
+
+/* =====================================================================
+   4. LÓGICA: o que o relógio está medindo agora?
+   Com janelas ligadas: a janela atual (ou a próxima). Sem nenhuma: o tempo
+   livre do dia (acordado, menos o trabalho).
+   ===================================================================== */
+let ref, ultimaChave;
+const minP = p => ref.dur * 60 * p / 100;                // quanto vale p% do período atual
+
+function referencia(h) {
+  const t = T(), ons = t.janelas.filter(j => j.on);
+
+  if (ons.length) {
+    const j = ons.find(j => dentro(h, j.inicio, j.fim))
+           || ons.slice().sort((a, b) => mod24(a.inicio - h) - mod24(b.inicio - h))[0];
+    const dur = durJ(j), agora = dentro(h, j.inicio, j.fim);
+    const passou = agora ? mod24(h - j.inicio) : -mod24(j.inicio - h);
+    return { janela: true, chave: `${tipo}|${j.id}|${j.inicio}|${j.fim}`, nome: j.nome,
+             cor: jc(t.janelas.indexOf(j)), inicio: j.inicio, dur, passou,
+             pct: Math.round(Math.max(passou, 0) / dur * 100),
+             l1: j.nome, l2: agora ? 'em andamento' : 'começa em ' + fmtHoras(-passou) };
   }
 
-  /* ================= CONFIG: tipos de dia ================= */
-  // As cores das janelas vêm do tema (j0, j1, j2), então não ficam aqui.
-  const PADRAO = {
-    trabalho: {
-      nome: 'Trabalho',
-      sono: { dormir: 23, acordar: 6 },
-      trab: { inicio: 10, fim: 17 },
-      janelas: [
-        { id: 'manha', nome: 'Manhã',              inicio: 7,  fim: 10, on: true },
-        { id: 'tarde', nome: 'Depois do trabalho', inicio: 17, fim: 22, on: true },
-      ],
-    },
-    fimsemana: {
-      nome: 'Fim de semana',
-      sono: { dormir: 0, acordar: 9 },
-      trab: null,
-      janelas: [{ id: 'dia', nome: 'Dia livre', inicio: 9, fim: 24, on: true }],
-    },
-    livre: {
-      nome: 'Folga',
-      sono: { dormir: 23, acordar: 7 },
-      trab: null,
-      janelas: [{ id: 'dia', nome: 'Dia livre', inicio: 7, fim: 23, on: true }],
-    },
-  };
+  const { dormir, acordar } = t.sono;
+  const livre = m => !dentro(m, dormir, acordar) && !(t.trab && dentro(m, t.trab.inicio, t.trab.fim));
+  const ateAgora = mod24(h - acordar) * 60;
+  let total = 0, feito = 0;
+  for (let k = 0; k < 1440; k++) if (livre(mod24(acordar + k / 60))) { total++; if (k < ateAgora) feito++; }
+  return { janela: false, chave: `${tipo}|livre|${total}`, nome: 'Tempo livre', dur: total / 60,
+           pct: Math.round(feito / total * 100),
+           l1: 'tempo livre', l2: t.trab && dentro(h, t.trab.inicio, t.trab.fim) ? 'em trabalho' : 'do dia' };
+}
 
-  const CHAVE_CFG = 'relogio-cfg-v2';
-  const salvo = ler(CHAVE_CFG, {});
-  let cfg = salvo.tipos || JSON.parse(JSON.stringify(PADRAO));
-  let manual = salvo.manual || null;
-  const salvarCfg = () => guardar(CHAVE_CFG, { tipos: cfg, manual });
+/* =====================================================================
+   5. DESENHO
+   ===================================================================== */
+const circ = (r, cor, w, extra = '') =>
+  `<circle cx="150" cy="150" r="${r}" fill="none" style="stroke:${cor}" stroke-width="${w}" ${extra}/>`;
+const alca = (g, i, c, r, cor, raio) =>
+  `<circle class="alca${g === 'j' ? ' pj' : ''}" data-g="${g}" data-i="${i}" data-c="${c}"
+           cx="${150 + r}" cy="150" r="${raio}" style="fill:${cor}"/>`;
+const btn = (attr, cor, on, html) => `<button class="btn${on ? ' on' : ''}" ${attr} style="--c:${cor}">${html}</button>`;
 
-  const dow = new Date().getDay();
-  let tipo = (manual && manual.dia === hojeStr() && cfg[manual.tipo])
-    ? manual.tipo
-    : ((dow === 0 || dow === 6) ? 'fimsemana' : 'trabalho');
-  const T = () => cfg[tipo];
+const alvoDaAlca = a => { const t = T(), g = a.dataset.g;
+  return g === 'sono' ? t.sono : g === 'trab' ? t.trab : t.janelas[+a.dataset.i]; };
 
-  /* ================= REFERÊNCIA ================= */
-  const dia = (chave, nome, dur, passou, rotulo) => ({
-    tipo: 'dia', chave: `${tipo}|${chave}`, nome, dur, passou, rotulo,
-    pct: Math.round(passou / dur * 100), titulo: `${nome.toUpperCase()} (${fmtHoras(dur)})`,
-  });
+function arco(perim, id, inicio, dur) {
+  const a = dur / 24 * perim;
+  set(id, { 'stroke-dasharray': `${a} ${perim - a}`, 'stroke-dashoffset': -inicio / 24 * perim });
+}
 
-  function referencia(h) {
-    const t = T(), ons = t.janelas.filter(j => j.on);
+// números 0-23 (fixos, desenhados uma vez)
+el('numeros').innerHTML = Array.from({ length: 24 }, (_, h) => {
+  const a = (h * 15 + ROT) * Math.PI / 180;
+  return `<text x="${150 + 128 * Math.cos(a)}" y="${150 + 128 * Math.sin(a)}" text-anchor="middle"
+           dominant-baseline="middle" class="num${h % 6 ? '' : ' forte'}">${h || '0/24'}</text>`;
+}).join('');
 
-    if (ons.length) {
-      const j = ons.find(j => dentro(h, j.inicio, j.fim))
-        || ons.slice().sort((a, b) => mod24(a.inicio - h) - mod24(b.inicio - h))[0];
-      const dur = durJ(j);
-      const passou = dentro(h, j.inicio, j.fim) ? mod24(h - j.inicio) : -mod24(j.inicio - h);
-      return {
-        tipo: 'janela', chave: `${tipo}|${j.id}|${j.inicio}|${j.fim}`,
-        nome: j.nome, cor: jc(t.janelas.indexOf(j)), inicio: j.inicio, fim: j.fim, dur, passou,
-        pct: Math.round(Math.max(passou, 0) / dur * 100),
-        rotulo: passou >= 0 ? 'da janela ' + j.nome.toLowerCase()
-                            : j.nome.toLowerCase() + ' em ' + fmtHoras(-passou),
-        titulo: `${j.nome.toUpperCase()}: ${pad(Math.floor(j.inicio))}–${pad(Math.floor(j.fim))} (${fmtHoras(dur)})`,
-      };
-    }
+// estrutura do relógio: refaz só ao trocar o tipo de dia ou ligar/desligar uma janela
+function construir() {
+  const t = T();
+  let s = circ(146, V('borda'), 1, 'stroke-dasharray="2 5"') + circ(100, V('livre'), 20)
+        + circ(100, V('sono'), 20, 'id="a-sono"');
+  if (t.trab) s += circ(100, V('trab'), 20, 'id="a-trab"');
+  s += circ(76, V('card'), 16)
+     + t.janelas.map((j, i) => circ(76, jc(i), 16, `id="j-${i}"`)).join('')
+     + circ(76, V('texto'), 16, 'id="prog"') + '<g id="ticks"></g>'
+     + `<g id="agora"><line x1="212" y1="150" x2="262" y2="150" style="stroke:var(--acento)" stroke-width="2.5"/>
+        <circle cx="250" cy="150" r="7" style="fill:var(--acento)"/></g>`;
 
-    const { dormir, acordar } = t.sono;
-    const durSono = mod24(acordar - dormir) || 24;
-    if (dentro(h, dormir, acordar))
-      return dia(`sono|${dormir}|${acordar}`, 'Sono', durSono, mod24(h - dormir), 'do sono');
+  s += ['dormir', 'acordar'].map(c => alca('sono', 0, c, 100, V('sono'), 11)).join('');
+  if (t.trab) s += ['inicio', 'fim'].map(c => alca('trab', 0, c, 100, V('trab'), 11)).join('');
+  t.janelas.forEach((j, i) => { if (j.on) s += ['inicio', 'fim'].map(c => alca('j', i, c, 76, jc(i), 8)).join(''); });
 
-    const ehLivre = m => !dentro(m / 60, dormir, acordar) && !(t.trab && dentro(m / 60, t.trab.inicio, t.trab.fim));
-    const alvoMin = mod24(h - acordar) * 60;
-    let total = 0, feito = 0;
-    for (let k = 0; k < 1440; k++)
-      if (ehLivre(mod24(acordar + k / 60) * 60)) { total++; if (k < alvoMin) feito++; }
-    const trabalhando = t.trab && dentro(h, t.trab.inicio, t.trab.fim);
-    return dia(`livre|${total}`, 'Tempo livre', total / 60, feito / 60,
-               trabalhando ? 'do tempo livre · em trabalho' : 'do tempo livre do dia');
-  }
+  set('grupo', { transform: `rotate(${ROT} 150 150)` });
+  el('grupo').innerHTML = s;
+  document.querySelectorAll('.alca').forEach(arrastavel);
 
-  let ref = referencia(horaAgora());
-  let ultimaChave = null;
-  const minP = p => ref.dur * 60 * p / 100;
+  el('tipos').innerHTML = Object.keys(cfg).map(k => btn(`data-k="${k}"`, V('texto'), k === tipo, cfg[k].nome)).join('');
+  el('toggles').innerHTML = t.janelas.map((j, i) =>
+    btn(`data-i="${i}"`, jc(i), j.on, `${j.nome}<small>${pad(j.inicio)} → ${pad(j.fim)} · ${j.on ? 'ligada' : 'desligada'}</small>`)).join('');
 
-  /* ================= LOG ================= */
-  const CHAVE_LOG = 'relogio-log';
-  let log = ler(CHAVE_LOG, []);
-  const salvarLog = () => guardar(CHAVE_LOG, log);
+  posicionar();
+  ultimaChave = null;
+}
 
-  function registrar(pct) {
-    const agora = new Date();
-    log.push({ id: agora.getTime(), quando: agora.toISOString(), pct, min: minP(pct), nome: ref.nome, tipo });
-    salvarLog();
-    desenharLog();
-  }
+// arcos e alças (roda também durante o arrastar)
+function posicionar() {
+  const t = T();
+  arco(100 * 2 * Math.PI, 'a-sono', t.sono.dormir, durJ({ inicio: t.sono.dormir, fim: t.sono.acordar }));
+  if (t.trab) arco(100 * 2 * Math.PI, 'a-trab', t.trab.inicio, durJ(t.trab));
+  t.janelas.forEach((j, i) => { arco(76 * 2 * Math.PI, 'j-' + i, j.inicio, durJ(j)); set('j-' + i, { opacity: j.on ? .4 : .1 }); });
+  document.querySelectorAll('.alca').forEach(a => a.setAttribute('transform', rot(alvoDaAlca(a)[a.dataset.c])));
+}
 
-  function desenharLog() {
-    const doDia = log.filter(x => chaveDia(new Date(x.quando)) === hojeStr());
-    const porNome = {};
-    doDia.forEach(x => { const n = x.nome || 'Outro'; porNome[n] = (porNome[n] || 0) + x.pct; });
+// parte que só muda quando o período de referência muda
+function desenharRef() {
+  el('prog').style.stroke = ref.cor || '';
+  el('ticks').innerHTML = !ref.janela ? '' : Array.from({ length: 11 }, (_, i) =>
+    `<line x1="214" y1="150" x2="236" y2="150" style="stroke:var(--bg)" stroke-width="${i % 5 ? 1.2 : 2.5}"
+      transform="${rot(ref.inicio + ref.dur * i / 10)}"/>`).join('');
+  el('tituloUsar').textContent = `USEI DE: ${ref.nome.toUpperCase()} (${fmtHoras(ref.dur)})`;
+  el('usar').innerHTML = PORCENTAGENS.map(p =>
+    `<button class="btn" data-p="${p}"><b>${p}%</b><small>${fmtMin(minP(p))}</small></button>`).join('');
+}
 
-    el('total').innerHTML = doDia.length
-      ? `Total: <b>${fmtMin(doDia.reduce((s, x) => s + x.min, 0))}</b>` +
-        Object.keys(porNome).map(n => ` · ${n} <b>${porNome[n]}%</b>`).join('')
-      : '';
-
-    el('log').innerHTML = doDia.length
-      ? doDia.slice().reverse().map(x => {
-          const d = new Date(x.quando);
-          return `<div class="item">
-            <span><span class="hora">${pad(d.getHours())}:${pad(d.getMinutes())}</span>
-              &nbsp; ${x.nome || ''} · ${x.pct}% → ${fmtMin(x.min)}</span>
-            <button data-id="${x.id}" title="apagar">×</button>
-          </div>`;
-        }).join('')
-      : '<div class="vazio">nada registrado ainda.</div>';
-  }
-
-  /* ================= RELÓGIO ================= */
-  const circ = (r, cor, w, extra = '') =>
-    `<circle cx="150" cy="150" r="${r}" fill="none" style="stroke:${cor}" stroke-width="${w}" ${extra}/>`;
-  const alca = (g, i, c, r, cor, raio) =>
-    `<circle class="alca${g === 'j' ? ' pj' : ''}" data-g="${g}" data-i="${i}" data-c="${c}"
-             cx="${150 + r}" cy="150" r="${raio}" style="fill:${cor}" />`;
-  const btn = (attr, cor, on, html) =>
-    `<button class="btn${on ? ' on' : ''}" ${attr} style="--c:${cor}">${html}</button>`;
-
-  function arco(perim, id, inicio, dur) {
-    const a = dur / 24 * perim;
-    set(id, { 'stroke-dasharray': `${a} ${perim - a}`, 'stroke-dashoffset': -inicio / 24 * perim });
-  }
-
-  const alvoDaAlca = a => {
-    const t = T(), g = a.dataset.g;
-    return g === 'sono' ? t.sono : g === 'trab' ? t.trab : t.janelas[Number(a.dataset.i)];
-  };
-
-  // números 0-23 em volta do relógio (fixos)
-  el('numeros').innerHTML = Array.from({ length: 24 }, (_, h) => {
-    const a = (h * 15 + ROT) * Math.PI / 180;
-    return `<text x="${150 + 128 * Math.cos(a)}" y="${150 + 128 * Math.sin(a)}" text-anchor="middle"
-             dominant-baseline="middle" class="${h % 6 ? 'num' : 'num forte'}">${h || '0/24'}</text>`;
+function desenharLog() {
+  const doDia = log.filter(x => chaveDia(new Date(x.quando)) === hoje());
+  const porNome = {};
+  doDia.forEach(x => porNome[x.nome] = (porNome[x.nome] || 0) + x.pct);
+  el('total').innerHTML = doDia.length
+    ? `Total <b>${fmtMin(doDia.reduce((s, x) => s + x.min, 0))}</b>` + Object.entries(porNome).map(([n, p]) => ` · ${n} <b>${p}%</b>`).join('')
+    : 'nada registrado ainda.';
+  el('log').innerHTML = doDia.slice().reverse().map(x => {
+    const d = new Date(x.quando);
+    return `<div class="item"><span>${pad(d.getHours())}:${pad(d.getMinutes())} · ${x.nome}</span>
+            ${x.pct}% → ${fmtMin(x.min)} <button class="fantasma" data-id="${x.id}">×</button></div>`;
   }).join('');
+}
 
-  // estrutura: só refaz ao trocar o tipo ou ligar/desligar janela
-  function construir() {
-    const t = T();
-    let s = circ(146, V('borda'), 1, 'stroke-dasharray="2 5"')
-          + circ(100, V('livre'), 20)
-          + circ(100, V('sono'), 20, 'id="a-sono"');
-    if (t.trab) s += circ(100, V('trab'), 20, 'id="a-trab"');
-    s += circ(76, V('trilho'), 16)
-       + t.janelas.map((j, i) => circ(76, jc(i), 16, `id="j-${i}"`)).join('')
-       + circ(76, V('texto'), 16, 'id="prog"')
-       + `<g id="ticks"></g>
-          <g id="agora">
-            <line x1="212" y1="150" x2="262" y2="150" style="stroke:var(--acento)" stroke-width="2.5" />
-            <circle cx="250" cy="150" r="7" style="fill:var(--acento)" />
-          </g>`;
+function aplicarVisual() {
+  document.documentElement.dataset.tema = vis.tema;
+  document.documentElement.classList.toggle('sem-crt', !vis.crt);
+  el('temas').innerHTML = Object.keys(TEMAS).map(k =>
+    `<button class="chip${k === vis.tema ? ' on' : ''}" data-t="${k}">${TEMAS[k]}</button>`).join('')
+    + `<button class="chip${vis.crt ? ' on' : ''}" data-crt>crt</button>`;
+  guardar('relogio-visual', vis);
+}
 
-    s += ['dormir', 'acordar'].map(c => alca('sono', 0, c, 100, V('sono'), 11)).join('');
-    if (t.trab) s += ['inicio', 'fim'].map(c => alca('trab', 0, c, 100, V('trab'), 11)).join('');
-    t.janelas.forEach((j, i) => {
-      if (j.on) s += ['inicio', 'fim'].map(c => alca('j', i, c, 76, jc(i), 8)).join('');
-    });
+// roda todo segundo: ponteiro, porcentagem e hora
+function atualizar() {
+  const h = horaAgora();
+  ref = referencia(h);
+  if (ref.chave !== ultimaChave) { ultimaChave = ref.chave; desenharRef(); }
 
-    set('grupo', { transform: `rotate(${ROT} 150 150)` });
-    el('grupo').innerHTML = s;
-    document.querySelectorAll('.alca').forEach(arrastavel);
+  const feito = ref.janela ? Math.min(Math.max(ref.passou, 0), ref.dur) / 24 * 76 * 2 * Math.PI : 0;
+  set('prog', { 'stroke-dasharray': `${feito} 999`, 'stroke-dashoffset': ref.janela ? -ref.inicio / 24 * 76 * 2 * Math.PI : 0 });
+  set('agora', { transform: rot(h) });
+  el('pct').textContent = ref.pct + '%';
+  el('l1').textContent = ref.l1;
+  el('l2').textContent = ref.l2;
+  el('hora').textContent = new Date().toLocaleTimeString('pt-BR');
+}
 
-    el('tipos').innerHTML = Object.keys(cfg).map(k => btn(`data-k="${k}"`, V('texto'), k === tipo, cfg[k].nome)).join('');
-    el('toggles').innerHTML = t.janelas.map((j, i) =>
-      btn(`data-i="${i}"`, jc(i), j.on,
-          `<span>${j.nome}</span><small>${pad(j.inicio)} → ${pad(j.fim)} · ${j.on ? 'ligada' : 'desligada'}</small>`)
-    ).join('');
+/* =====================================================================
+   6. INTERAÇÃO
+   ===================================================================== */
+function horarioDoPonteiro(e) {
+  const r = el('grupo').ownerSVGElement.getBoundingClientRect();
+  const graus = (Math.atan2(e.clientY - (r.top + r.height / 2), e.clientX - (r.left + r.width / 2)) * 180 / Math.PI - ROT + 360) % 360;
+  return mod24(Math.round(graus / 15 * 4) / 4);          // trava de 15 em 15 min
+}
 
-    const ponto = (cor, nome) => `<span><i style="background:${cor}"></i>${nome}</span>`;
-    el('legenda').innerHTML = ponto(V('sono'), 'Sono')
-      + (t.trab ? ponto(V('trab'), 'Trabalho') : '')
-      + ponto(V('livre'), 'Livre')
-      + t.janelas.map((j, i) => ponto(jc(i), j.nome)).join('');
-
-    posicionar();
-    ultimaChave = null;
-  }
-
-  function posicionar() {
-    const t = T();
-    arco(C, 'a-sono', t.sono.dormir, mod24(t.sono.acordar - t.sono.dormir) || 24);
-    if (t.trab) arco(C, 'a-trab', t.trab.inicio, durJ(t.trab));
-    t.janelas.forEach((j, i) => {
-      arco(CJ, 'j-' + i, j.inicio, durJ(j));
-      set('j-' + i, { opacity: j.on ? 0.4 : 0.1 });
-    });
-    document.querySelectorAll('.alca').forEach(a =>
-      a.setAttribute('transform', rot(alvoDaAlca(a)[a.dataset.c])));
-  }
-
-  function desenharRef() {
-    if (ref.tipo === 'janela') {
-      el('prog').style.stroke = ref.cor;
-      el('ticks').innerHTML = Array.from({ length: 11 }, (_, i) =>
-        `<line x1="214" y1="150" x2="236" y2="150" style="stroke:var(--bg)" stroke-width="${i % 5 === 0 ? 2.5 : 1.2}"
-          transform="${rot(ref.inicio + ref.dur * i / 10)}"/>`).join('');
-    } else {
-      set('prog', { 'stroke-dasharray': '0 ' + CJ });
-      el('ticks').innerHTML = '';
-    }
-    el('tituloContador').textContent = ref.titulo;
-    el('tituloUsar').textContent = 'USEI DE: ' + ref.nome.toUpperCase();
-    el('contador').innerHTML = [1, 5, 10].map(p =>
-      `<div class="linha"><span>${p}%</span><span>${fmtMin(minP(p))}</span></div>`).join('');
-    el('usar').innerHTML = [1, 5, 10, 20].map(p =>
-      `<button class="btn" data-p="${p}"><b>${p}%</b><small>${fmtMin(minP(p))}</small></button>`).join('');
-  }
-
-  // quebra o texto do centro em até 2 linhas pra caber dentro do anel
-  function quebrar(s, max = 24) {
-    const linhas = [''];
-    s.split(' ').forEach(w => {
-      const u = linhas[linhas.length - 1], n = (u + ' ' + w).trim();
-      if (n.length <= max) linhas[linhas.length - 1] = n; else linhas.push(w);
-    });
-    return linhas.slice(0, 2);
-  }
-
-  function atualizar() {
-    const h = horaAgora();
-    ref = referencia(h);
-    if (ref.chave !== ultimaChave) { ultimaChave = ref.chave; desenharRef(); }
-
-    set('agora', { transform: rot(h) });
-    if (ref.tipo === 'janela') {
-      const a = Math.min(Math.max(ref.passou, 0), ref.dur) / 24 * CJ;
-      set('prog', { 'stroke-dasharray': `${a} ${CJ - a}`, 'stroke-dashoffset': -ref.inicio / 24 * CJ });
-    }
-
-    el('pct').textContent = ref.pct + '%';
-    el('rotulo').innerHTML = quebrar(ref.rotulo)
-      .map((t, i) => `<tspan x="150" dy="${i ? 10 : 0}">${t}</tspan>`).join('');
-    el('hora').textContent = TESTE !== null
-      ? 'teste ' + fmtHoras(h)
-      : new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  }
-
-  /* ================= INTERAÇÃO ================= */
-  function horarioDoPonteiro(e) {
-    const r = svg.getBoundingClientRect();
-    const dx = e.clientX - (r.left + r.width / 2);
-    const dy = e.clientY - (r.top + r.height / 2);
-    const graus = (Math.atan2(dy, dx) * 180 / Math.PI - ROT + 360) % 360;
-    return mod24(Math.round(graus / 15 * 4) / 4); // trava de 15 em 15 min
-  }
-
-  function arrastavel(a) {
-    a.addEventListener('pointerdown', e => a.setPointerCapture(e.pointerId));
-    a.addEventListener('pointermove', e => {
-      if (!a.hasPointerCapture(e.pointerId)) return;
-      alvoDaAlca(a)[a.dataset.c] = horarioDoPonteiro(e);
-      posicionar();
-      atualizar();
-    });
-    a.addEventListener('pointerup', () => { salvarCfg(); construir(); atualizar(); });
-  }
-
-  const aoClicar = (id, acao) => el(id).addEventListener('click', e => {
-    const b = e.target.closest('button');
-    if (b) acao(b);
-  });
-  const refazer = () => { salvarCfg(); construir(); atualizar(); };
-
-  aoClicar('temas', b => {
-    if (b.dataset.t) vis.tema = b.dataset.t; else vis.crt = !vis.crt;
-    aplicarVisual();
-  });
-  aoClicar('tipos', b => { tipo = b.dataset.k; manual = { dia: hojeStr(), tipo }; refazer(); });
-  aoClicar('toggles', b => { const j = T().janelas[Number(b.dataset.i)]; j.on = !j.on; refazer(); });
-  aoClicar('usar', b => registrar(Number(b.dataset.p)));
-  aoClicar('log', b => { log = log.filter(x => x.id !== Number(b.dataset.id)); salvarLog(); desenharLog(); });
-  el('limpar').onclick = () => {
-    log = log.filter(x => chaveDia(new Date(x.quando)) !== hojeStr());
-    salvarLog();
-    desenharLog();
+function arrastavel(a) {
+  a.onpointerdown = e => a.setPointerCapture(e.pointerId);
+  a.onpointermove = e => {
+    if (!a.hasPointerCapture(e.pointerId)) return;
+    alvoDaAlca(a)[a.dataset.c] = horarioDoPonteiro(e);
+    posicionar(); atualizar();
   };
+  a.onpointerup = () => refazer();
+}
 
-  aplicarVisual();
-  construir();
-  desenharLog();
-  atualizar();
-  setInterval(atualizar, 1000);
+const refazer = () => { salvarCfg(); construir(); atualizar(); };
+const aoClicar = (id, acao) => el(id).addEventListener('click', e => { const b = e.target.closest('button'); if (b) acao(b); });
+
+aoClicar('temas',   b => { b.dataset.t ? vis.tema = b.dataset.t : vis.crt = !vis.crt; aplicarVisual(); });
+aoClicar('tipos',   b => { tipo = b.dataset.k; manual = { dia: hoje(), tipo }; refazer(); });
+aoClicar('toggles', b => { const j = T().janelas[+b.dataset.i]; j.on = !j.on; refazer(); });
+aoClicar('usar',    b => {
+  const p = +b.dataset.p, agora = new Date();
+  log.push({ id: agora.getTime(), quando: agora.toISOString(), pct: p, min: minP(p), nome: ref.nome, tipo });
+  salvarLog(); desenharLog();
+});
+aoClicar('log',     b => { log = log.filter(x => x.id !== +b.dataset.id); salvarLog(); desenharLog(); });
+el('limpar').onclick = () => { log = log.filter(x => chaveDia(new Date(x.quando)) !== hoje()); salvarLog(); desenharLog(); };
+
+/* =====================================================================
+   7. INÍCIO
+   ===================================================================== */
+aplicarVisual();
+construir();
+desenharLog();
+atualizar();
+setInterval(atualizar, 1000);
 </script>
 </body>
 </html>
