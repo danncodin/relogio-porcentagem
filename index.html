@@ -2,92 +2,186 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Relógio de Porcentagem</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=VT323&display=swap" rel="stylesheet">
   <style>
-    :root { --bg:#111; --card:#1a1a1a; --borda:#333; --mudo:#888; --verde:#4ade80; }
-    body { margin:0; min-height:100vh; background:var(--bg); color:#fff; font-family:sans-serif;
-           display:flex; flex-wrap:wrap; align-items:center; justify-content:center;
-           gap:32px; padding:16px; box-sizing:border-box; }
+    /* ============ TEMAS ============ */
+    /* cozy (padrão) */
+    :root {
+      --bg:#17130f; --bg2:#241d16; --card:#211b15; --borda:#3a2f25;
+      --texto:#eadfca; --mudo:#9a8b78; --trilho:#2a221a;
+      --livre:#8fbf8a; --sono:#6f8fd1; --trab:#7d7468;
+      --j0:#e3b261; --j1:#c79ad0; --j2:#6fc3b8;
+      --acento:#e3b261; --glow:rgba(227,178,97,.45);
+      --raio:14px; --scan:.10; --vig:.38;
+      --pctfx:drop-shadow(0 0 5px var(--glow));
+    }
+    /* lain */
+    html[data-tema="lain"] {
+      --bg:#0a0d0e; --bg2:#141b1d; --card:#10161a; --borda:#26323a;
+      --texto:#cfe3dc; --mudo:#6f8a86; --trilho:#141b1d;
+      --livre:#6fd6a0; --sono:#5a7fe0; --trab:#5b6770;
+      --j0:#d9a441; --j1:#b58be0; --j2:#4fd1c5;
+      --acento:#e0413a; --glow:rgba(224,65,58,.5);
+      --raio:3px; --scan:.24; --vig:.6;
+      --pctfx:drop-shadow(1.5px 0 0 rgba(255,40,80,.55)) drop-shadow(-1.5px 0 0 rgba(0,220,255,.5)) drop-shadow(0 0 5px var(--glow));
+    }
+    /* fósforo (terminal verde) */
+    html[data-tema="fosforo"] {
+      --bg:#040904; --bg2:#0a160a; --card:#081208; --borda:#1b3a1b;
+      --texto:#a5ffa8; --mudo:#4f9a54; --trilho:#0c180c;
+      --livre:#39ff6a; --sono:#3fb4ff; --trab:#3a6b3d;
+      --j0:#d7ff5a; --j1:#ffb454; --j2:#5affd0;
+      --acento:#a5ffa8; --glow:rgba(57,255,106,.55);
+      --raio:0px; --scan:.3; --vig:.6;
+      --pctfx:drop-shadow(0 0 6px var(--glow));
+    }
+
+    /* ============ BASE ============ */
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; color:var(--texto);
+           font-family:'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace; font-size:14px;
+           background:radial-gradient(ellipse at 50% 25%, var(--bg2) 0%, var(--bg) 70%) fixed;
+           padding-bottom:env(safe-area-inset-bottom); }
     button { font-family:inherit; cursor:pointer; }
-    .relogio { display:flex; flex-direction:column; align-items:center; gap:12px; width:min(90vw,65vh,480px); }
-    svg { width:100%; touch-action:none; }
+
+    /* efeito CRT: scanlines + vinheta + grão */
+    .crt { position:fixed; inset:0; pointer-events:none; z-index:50;
+           background:
+             repeating-linear-gradient(to bottom, rgba(0,0,0,var(--scan)) 0 1px, transparent 1px 3px),
+             radial-gradient(ellipse at center, transparent 58%, rgba(0,0,0,var(--vig)) 100%); }
+    .crt::after { content:''; position:absolute; inset:0; opacity:.07; mix-blend-mode:overlay;
+      background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); }
+    html.sem-crt .crt { display:none; }
+
+    /* ============ LAYOUT ============ */
+    .topo { max-width:1200px; margin:0 auto; padding:14px 16px 0; display:flex; flex-wrap:wrap;
+            gap:10px; justify-content:space-between; align-items:center; }
+    .marca { letter-spacing:.16em; font-size:11px; color:var(--mudo); }
+    .marca b { color:var(--acento); font-weight:500; }
+    .chips { display:flex; gap:6px; flex-wrap:wrap; }
+    .chip { padding:5px 10px; font-size:11px; letter-spacing:.06em; background:transparent; color:var(--mudo);
+            border:1px solid var(--borda); border-radius:var(--raio); }
+    .chip.on { color:var(--bg); background:var(--acento); border-color:var(--acento); }
+
+    .app { max-width:1200px; margin:0 auto; padding:16px; display:grid;
+           grid-template-columns:minmax(0,1fr) minmax(300px,400px); gap:24px; align-items:start; }
+    .relogio { position:sticky; top:12px; display:flex; flex-direction:column; align-items:center; gap:12px; }
+    svg { width:100%; height:auto; max-height:calc(100vh - 250px); touch-action:none; }
+    .painel { display:flex; flex-direction:column; gap:14px; min-width:0; }
+    .rodape { text-align:center; font-size:11px; letter-spacing:.2em; color:var(--mudo); padding:8px 16px 24px; opacity:.7; }
+
+    @media (max-width:860px) {
+      .app { grid-template-columns:1fr; gap:16px; }
+      .relogio { position:static; }
+      svg { max-height:none; max-width:540px; }
+    }
+    /* telas de toque: alças maiores */
+    @media (pointer:coarse) { .alca { r:14px; } .alca.pj { r:11px; } }
+
+    /* ============ RELÓGIO (SVG) ============ */
     .alca { cursor:grab; stroke:var(--bg); stroke-width:3; }
-    .painel { display:flex; flex-direction:column; gap:16px; width:280px; max-width:90vw; }
-    .num { fill:#777; font-size:9px; }
-    .num.forte { fill:#fff; font-size:11px; font-weight:bold; }
-    #hora { font-variant-numeric:tabular-nums; }
+    .num { fill:var(--mudo); font-size:9px; }
+    .num.forte { fill:var(--texto); font-size:11px; font-weight:bold; }
+    .kana { fill:var(--mudo); font-size:9px; letter-spacing:.3em; }
+    #pct { fill:var(--texto); font-family:'VT323', ui-monospace, monospace; font-size:46px; filter:var(--pctfx); }
+    #rotulo { fill:var(--mudo); font-size:8.5px; }
+    #hora { fill:var(--texto); font-size:14px; font-variant-numeric:tabular-nums; }
 
-    /* botões (tipo de dia, janelas e uso) */
-    .btn { padding:9px 4px; border:1px solid var(--borda); border-radius:8px; background:var(--card);
-           color:#aaa; font-size:14px; display:flex; flex-direction:column; gap:2px; align-items:center; }
-    .btn small { font-size:11px; opacity:.85; }
-    .btn.on { background:var(--c); color:#111; border-color:var(--c); }
-    .linhaBtn { display:flex; gap:8px; width:100%; }
-    .linhaBtn .btn { flex:1; }
-    .rotuloBtn { font-size:11px; color:#666; align-self:flex-start; margin-bottom:-6px; }
-    .usar { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
-    .usar .btn { padding:10px 4px; border-color:#2f6b47; background:#14261c; color:var(--verde); }
-    .usar .btn:active { background:#1d3a29; }
-    .usar b { font-size:16px; }
-    .usar small { color:#8fd7ad; }
+    @media (prefers-reduced-motion:no-preference) {
+      html[data-tema="lain"] #pct { animation:glitch 7s infinite steps(1); }
+      @keyframes glitch { 0%,92%,100% { transform:translate(0,0); } 93% { transform:translate(2px,0); } 95% { transform:translate(-2px,1px); } 97% { transform:translate(1px,-1px); } }
+      .crt { animation:cintila 5s infinite steps(1); }
+      @keyframes cintila { 0%,100% { opacity:1; } 50% { opacity:.94; } 52% { opacity:1; } }
+    }
 
-    .card { background:var(--card); border-radius:10px; padding:12px 14px; }
-    .card h3 { margin:0 0 8px; font-size:13px; color:var(--mudo); font-weight:normal; }
-    .linha { display:flex; justify-content:space-between; padding:3px 0; font-size:18px; }
+    /* ============ BOTÕES E CARDS ============ */
+    .btn { padding:9px 6px; border:1px solid var(--borda); border-radius:var(--raio); background:var(--card);
+           color:var(--mudo); font-size:13px; display:flex; flex-direction:column; gap:2px; align-items:center;
+           flex:1 1 90px; }
+    .btn small { font-size:10px; opacity:.85; }
+    .btn:hover { border-color:var(--acento); }
+    .btn.on { background:var(--c); color:var(--bg); border-color:var(--c); }
+    .linhaBtn { display:flex; flex-wrap:wrap; gap:8px; width:100%; }
+    .rotuloBtn { font-size:10px; letter-spacing:.14em; color:var(--mudo); align-self:flex-start; margin-bottom:-6px; }
+
+    .card { background:var(--card); border:1px solid var(--borda); border-radius:var(--raio); padding:12px 14px; }
+    .card h3 { margin:0 0 8px; font-size:11px; letter-spacing:.1em; color:var(--mudo); font-weight:400; }
+    .linha { display:flex; justify-content:space-between; padding:3px 0; font-size:17px; }
     .linha span:first-child { color:var(--mudo); }
-    .legenda { display:flex; flex-wrap:wrap; gap:6px 14px; font-size:13px; color:#aaa; }
+    .legenda { display:flex; flex-wrap:wrap; gap:6px 14px; font-size:12px; color:var(--mudo); }
     .legenda i { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:6px; }
 
-    .total { font-size:14px; color:#aaa; margin-bottom:8px; }
-    .total b { color:#fff; }
-    #log { max-height:200px; overflow-y:auto; }
-    .item { display:flex; justify-content:space-between; align-items:center;
-            padding:5px 0; font-size:14px; border-top:1px solid #262626; }
+    .usar { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+    .usar .btn { padding:10px 4px; color:var(--livre); flex:none; }
+    .usar .btn:active { background:var(--trilho); }
+    .usar b { font-size:16px; font-weight:500; }
+    .usar small { color:var(--mudo); }
+
+    .total { font-size:13px; color:var(--mudo); margin-bottom:8px; }
+    .total b { color:var(--texto); font-weight:500; }
+    #log { max-height:220px; overflow-y:auto; }
+    .item { display:flex; justify-content:space-between; align-items:center; padding:5px 0;
+            font-size:13px; border-top:1px solid var(--borda); }
     .item .hora { color:var(--mudo); font-variant-numeric:tabular-nums; }
-    .item button, #limpar { background:none; border:none; color:#666; padding:0; }
+    .item button, #limpar { background:none; border:none; color:var(--mudo); padding:0; }
     .item button { font-size:16px; }
-    #limpar { margin-top:8px; font-size:12px; }
-    .item button:hover, #limpar:hover { color:#f87171; }
-    .vazio { color:#666; font-size:13px; }
+    #limpar { margin-top:8px; font-size:11px; }
+    .item button:hover, #limpar:hover { color:var(--acento); }
+    .vazio { color:var(--mudo); font-size:12px; }
   </style>
 </head>
 <body>
-  <div class="relogio">
-    <svg viewBox="-10 -10 320 320">
-      <g id="grupo"></g>
-      <g id="numeros"></g>
-      <text id="pct" x="150" y="138" text-anchor="middle" dominant-baseline="middle" fill="#fff" font-size="34"></text>
-      <text id="rotulo" x="150" y="164" text-anchor="middle" fill="#888" font-size="11"></text>
-      <text id="hora" x="150" y="186" text-anchor="middle" fill="#ccc" font-size="15"></text>
-    </svg>
+  <div class="crt"></div>
 
-    <span class="rotuloBtn">Tipo de dia</span>
-    <div class="linhaBtn" id="tipos"></div>
-    <span class="rotuloBtn">Janelas (liga / desliga)</span>
-    <div class="linhaBtn" id="toggles"></div>
-  </div>
+  <header class="topo">
+    <span class="marca">wired <b>//</b> relógio de porcentagem</span>
+    <div class="chips" id="temas"></div>
+  </header>
 
-  <div class="painel">
-    <div class="legenda" id="legenda"></div>
+  <main class="app">
+    <section class="relogio">
+      <svg viewBox="-10 -10 320 320">
+        <g id="grupo"></g>
+        <g id="numeros"></g>
+        <text class="kana" x="150" y="114" text-anchor="middle">時間</text>
+        <text id="pct" x="150" y="142" text-anchor="middle" dominant-baseline="middle"></text>
+        <text id="rotulo" x="150" y="160" text-anchor="middle"></text>
+        <text id="hora" x="150" y="186" text-anchor="middle"></text>
+      </svg>
 
-    <div class="card">
-      <h3 id="tituloContador"></h3>
-      <div id="contador"></div>
-    </div>
+      <span class="rotuloBtn">TIPO DE DIA</span>
+      <div class="linhaBtn" id="tipos"></div>
+      <span class="rotuloBtn">JANELAS (LIGA / DESLIGA)</span>
+      <div class="linhaBtn" id="toggles"></div>
+    </section>
 
-    <div class="card">
-      <h3 id="tituloUsar"></h3>
-      <div class="usar" id="usar"></div>
-    </div>
+    <aside class="painel">
+      <div class="legenda" id="legenda"></div>
 
-    <div class="card">
-      <h3>Log de hoje</h3>
-      <div class="total" id="total"></div>
-      <div id="log"></div>
-      <button id="limpar">limpar o log de hoje</button>
-    </div>
-  </div>
+      <div class="card">
+        <h3 id="tituloContador"></h3>
+        <div id="contador"></div>
+      </div>
+
+      <div class="card">
+        <h3 id="tituloUsar"></h3>
+        <div class="usar" id="usar"></div>
+      </div>
+
+      <div class="card">
+        <h3>LOG DE HOJE</h3>
+        <div class="total" id="total"></div>
+        <div id="log"></div>
+        <button id="limpar">limpar o log de hoje</button>
+      </div>
+    </aside>
+  </main>
+
+  <div class="rodape">present day, present time</div>
 
 <script>
   /* ================= BÁSICO ================= */
@@ -95,7 +189,6 @@
   const CJ = 2 * Math.PI * 76;   // anel interno (janelas)
   const ROT = -142.5;            // -90 = meia-noite no topo
   const TESTE = null;            // número (ex.: 19.5) pra simular o horário
-  const COR_TRAB = '#64748b';
 
   const el = id => document.getElementById(id);
   const svg = document.querySelector('svg');
@@ -103,6 +196,8 @@
   const pad = n => String(n).padStart(2, '0');
   const set = (id, attrs) => { const n = el(id); if (n) for (const k in attrs) n.setAttribute(k, attrs[k]); };
   const rot = h => `rotate(${h * 15} 150 150)`;
+  const V = nome => `var(--${nome})`;      // cor do tema atual
+  const jc = i => V('j' + (i % 3));        // cor da janela i
 
   const ler = (k, padrao) => { try { return JSON.parse(localStorage.getItem(k)) ?? padrao; } catch (e) { return padrao; } };
   const guardar = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
@@ -121,28 +216,44 @@
     return TESTE ?? (d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600);
   };
 
+  /* ================= VISUAL (tema + CRT) ================= */
+  const TEMAS = { cozy: 'cozy', lain: 'lain', fosforo: 'fósforo' };
+  const CHAVE_VIS = 'relogio-visual';
+  let vis = { tema: 'cozy', crt: true, ...ler(CHAVE_VIS, {}) };
+  if (!TEMAS[vis.tema]) vis.tema = 'cozy';
+
+  function aplicarVisual() {
+    document.documentElement.dataset.tema = vis.tema;
+    document.documentElement.classList.toggle('sem-crt', !vis.crt);
+    el('temas').innerHTML =
+      Object.keys(TEMAS).map(k => `<button class="chip${k === vis.tema ? ' on' : ''}" data-t="${k}">${TEMAS[k]}</button>`).join('')
+      + `<button class="chip${vis.crt ? ' on' : ''}" data-crt="1">crt</button>`;
+    guardar(CHAVE_VIS, vis);
+  }
+
   /* ================= CONFIG: tipos de dia ================= */
+  // As cores das janelas vêm do tema (j0, j1, j2), então não ficam aqui.
   const PADRAO = {
     trabalho: {
       nome: 'Trabalho',
       sono: { dormir: 23, acordar: 6 },
       trab: { inicio: 10, fim: 17 },
       janelas: [
-        { id: 'manha', nome: 'Manhã',              inicio: 7,  fim: 10, cor: '#fbbf24', on: true },
-        { id: 'tarde', nome: 'Depois do trabalho', inicio: 17, fim: 22, cor: '#a78bfa', on: true },
+        { id: 'manha', nome: 'Manhã',              inicio: 7,  fim: 10, on: true },
+        { id: 'tarde', nome: 'Depois do trabalho', inicio: 17, fim: 22, on: true },
       ],
     },
     fimsemana: {
       nome: 'Fim de semana',
       sono: { dormir: 0, acordar: 9 },
       trab: null,
-      janelas: [{ id: 'dia', nome: 'Dia livre', inicio: 9, fim: 24, cor: '#2dd4bf', on: true }],
+      janelas: [{ id: 'dia', nome: 'Dia livre', inicio: 9, fim: 24, on: true }],
     },
     livre: {
       nome: 'Folga',
       sono: { dormir: 23, acordar: 7 },
       trab: null,
-      janelas: [{ id: 'dia', nome: 'Dia livre', inicio: 7, fim: 23, cor: '#2dd4bf', on: true }],
+      janelas: [{ id: 'dia', nome: 'Dia livre', inicio: 7, fim: 23, on: true }],
     },
   };
 
@@ -152,7 +263,6 @@
   let manual = salvo.manual || null;
   const salvarCfg = () => guardar(CHAVE_CFG, { tipos: cfg, manual });
 
-  // tipo do dia: automático pelo dia da semana, a menos que eu tenha trocado hoje
   const dow = new Date().getDay();
   let tipo = (manual && manual.dia === hojeStr() && cfg[manual.tipo])
     ? manual.tipo
@@ -160,11 +270,9 @@
   const T = () => cfg[tipo];
 
   /* ================= REFERÊNCIA ================= */
-  // O que o relógio mede agora: janela atual (ou próxima), ou o tempo livre do dia / sono
-  // se nenhuma janela estiver ligada.
   const dia = (chave, nome, dur, passou, rotulo) => ({
     tipo: 'dia', chave: `${tipo}|${chave}`, nome, dur, passou, rotulo,
-    pct: Math.round(passou / dur * 100), titulo: `${nome} (${fmtHoras(dur)})`,
+    pct: Math.round(passou / dur * 100), titulo: `${nome.toUpperCase()} (${fmtHoras(dur)})`,
   });
 
   function referencia(h) {
@@ -177,11 +285,11 @@
       const passou = dentro(h, j.inicio, j.fim) ? mod24(h - j.inicio) : -mod24(j.inicio - h);
       return {
         tipo: 'janela', chave: `${tipo}|${j.id}|${j.inicio}|${j.fim}`,
-        nome: j.nome, cor: j.cor, inicio: j.inicio, fim: j.fim, dur, passou,
+        nome: j.nome, cor: jc(t.janelas.indexOf(j)), inicio: j.inicio, fim: j.fim, dur, passou,
         pct: Math.round(Math.max(passou, 0) / dur * 100),
         rotulo: passou >= 0 ? 'da janela ' + j.nome.toLowerCase()
-                            : j.nome.toLowerCase() + ' começa em ' + fmtHoras(-passou),
-        titulo: `${j.nome}: ${pad(Math.floor(j.inicio))}–${pad(Math.floor(j.fim))} (${fmtHoras(dur)})`,
+                            : j.nome.toLowerCase() + ' em ' + fmtHoras(-passou),
+        titulo: `${j.nome.toUpperCase()}: ${pad(Math.floor(j.inicio))}–${pad(Math.floor(j.fim))} (${fmtHoras(dur)})`,
       };
     }
 
@@ -190,7 +298,6 @@
     if (dentro(h, dormir, acordar))
       return dia(`sono|${dormir}|${acordar}`, 'Sono', durSono, mod24(h - dormir), 'do sono');
 
-    // tempo livre = acordado menos trabalho, contado minuto a minuto
     const ehLivre = m => !dentro(m / 60, dormir, acordar) && !(t.trab && dentro(m / 60, t.trab.inicio, t.trab.fim));
     const alvoMin = mod24(h - acordar) * 60;
     let total = 0, feito = 0;
@@ -203,7 +310,7 @@
 
   let ref = referencia(horaAgora());
   let ultimaChave = null;
-  const minP = p => ref.dur * 60 * p / 100; // quanto vale p% do período atual
+  const minP = p => ref.dur * 60 * p / 100;
 
   /* ================= LOG ================= */
   const CHAVE_LOG = 'relogio-log';
@@ -236,14 +343,15 @@
             <button data-id="${x.id}" title="apagar">×</button>
           </div>`;
         }).join('')
-      : '<div class="vazio">Nada registrado ainda.</div>';
+      : '<div class="vazio">nada registrado ainda.</div>';
   }
 
   /* ================= RELÓGIO ================= */
   const circ = (r, cor, w, extra = '') =>
-    `<circle cx="150" cy="150" r="${r}" fill="none" stroke="${cor}" stroke-width="${w}" ${extra}/>`;
+    `<circle cx="150" cy="150" r="${r}" fill="none" style="stroke:${cor}" stroke-width="${w}" ${extra}/>`;
   const alca = (g, i, c, r, cor, raio) =>
-    `<circle class="alca" data-g="${g}" data-i="${i}" data-c="${c}" cx="${150 + r}" cy="150" r="${raio}" fill="${cor}" />`;
+    `<circle class="alca${g === 'j' ? ' pj' : ''}" data-g="${g}" data-i="${i}" data-c="${c}"
+             cx="${150 + r}" cy="150" r="${raio}" style="fill:${cor}" />`;
   const btn = (attr, cor, on, html) =>
     `<button class="btn${on ? ' on' : ''}" ${attr} style="--c:${cor}">${html}</button>`;
 
@@ -252,7 +360,6 @@
     set(id, { 'stroke-dasharray': `${a} ${perim - a}`, 'stroke-dashoffset': -inicio / 24 * perim });
   }
 
-  // objeto que uma alça controla
   const alvoDaAlca = a => {
     const t = T(), g = a.dataset.g;
     return g === 'sono' ? t.sono : g === 'trab' ? t.trab : t.janelas[Number(a.dataset.i)];
@@ -268,73 +375,83 @@
   // estrutura: só refaz ao trocar o tipo ou ligar/desligar janela
   function construir() {
     const t = T();
-    let s = circ(100, '#222', 20) + circ(100, '#4ade80', 20) + circ(100, '#3b82f6', 20, 'id="a-sono"');
-    if (t.trab) s += circ(100, COR_TRAB, 20, 'id="a-trab"');
-    s += circ(76, '#1c1c1c', 16)
-       + t.janelas.map((j, i) => circ(76, j.cor, 16, `id="j-${i}"`)).join('')
-       + circ(76, '#fff', 16, 'id="prog"')
+    let s = circ(146, V('borda'), 1, 'stroke-dasharray="2 5"')
+          + circ(100, V('livre'), 20)
+          + circ(100, V('sono'), 20, 'id="a-sono"');
+    if (t.trab) s += circ(100, V('trab'), 20, 'id="a-trab"');
+    s += circ(76, V('trilho'), 16)
+       + t.janelas.map((j, i) => circ(76, jc(i), 16, `id="j-${i}"`)).join('')
+       + circ(76, V('texto'), 16, 'id="prog"')
        + `<g id="ticks"></g>
           <g id="agora">
-            <line x1="212" y1="150" x2="262" y2="150" stroke="#fff" stroke-width="2.5" />
-            <circle cx="250" cy="150" r="7" fill="#fff" />
+            <line x1="212" y1="150" x2="262" y2="150" style="stroke:var(--acento)" stroke-width="2.5" />
+            <circle cx="250" cy="150" r="7" style="fill:var(--acento)" />
           </g>`;
 
-    s += ['dormir', 'acordar'].map(c => alca('sono', 0, c, 100, '#3b82f6', 11)).join('');
-    if (t.trab) s += ['inicio', 'fim'].map(c => alca('trab', 0, c, 100, COR_TRAB, 11)).join('');
+    s += ['dormir', 'acordar'].map(c => alca('sono', 0, c, 100, V('sono'), 11)).join('');
+    if (t.trab) s += ['inicio', 'fim'].map(c => alca('trab', 0, c, 100, V('trab'), 11)).join('');
     t.janelas.forEach((j, i) => {
-      if (j.on) s += ['inicio', 'fim'].map(c => alca('j', i, c, 76, j.cor, 8)).join('');
+      if (j.on) s += ['inicio', 'fim'].map(c => alca('j', i, c, 76, jc(i), 8)).join('');
     });
 
     set('grupo', { transform: `rotate(${ROT} 150 150)` });
     el('grupo').innerHTML = s;
     document.querySelectorAll('.alca').forEach(arrastavel);
 
-    el('tipos').innerHTML = Object.keys(cfg).map(k => btn(`data-k="${k}"`, '#fff', k === tipo, cfg[k].nome)).join('');
+    el('tipos').innerHTML = Object.keys(cfg).map(k => btn(`data-k="${k}"`, V('texto'), k === tipo, cfg[k].nome)).join('');
     el('toggles').innerHTML = t.janelas.map((j, i) =>
-      btn(`data-i="${i}"`, j.cor, j.on,
+      btn(`data-i="${i}"`, jc(i), j.on,
           `<span>${j.nome}</span><small>${pad(j.inicio)} → ${pad(j.fim)} · ${j.on ? 'ligada' : 'desligada'}</small>`)
     ).join('');
 
     const ponto = (cor, nome) => `<span><i style="background:${cor}"></i>${nome}</span>`;
-    el('legenda').innerHTML = ponto('#3b82f6', 'Sono')
-      + (t.trab ? ponto(COR_TRAB, 'Trabalho') : '')
-      + ponto('#4ade80', 'Livre')
-      + t.janelas.map(j => ponto(j.cor, j.nome)).join('');
+    el('legenda').innerHTML = ponto(V('sono'), 'Sono')
+      + (t.trab ? ponto(V('trab'), 'Trabalho') : '')
+      + ponto(V('livre'), 'Livre')
+      + t.janelas.map((j, i) => ponto(jc(i), j.nome)).join('');
 
     posicionar();
     ultimaChave = null;
   }
 
-  // arcos e alças (roda também durante o arrastar)
   function posicionar() {
     const t = T();
     arco(C, 'a-sono', t.sono.dormir, mod24(t.sono.acordar - t.sono.dormir) || 24);
     if (t.trab) arco(C, 'a-trab', t.trab.inicio, durJ(t.trab));
     t.janelas.forEach((j, i) => {
       arco(CJ, 'j-' + i, j.inicio, durJ(j));
-      set('j-' + i, { opacity: j.on ? 0.35 : 0.08 });
+      set('j-' + i, { opacity: j.on ? 0.4 : 0.1 });
     });
     document.querySelectorAll('.alca').forEach(a =>
       a.setAttribute('transform', rot(alvoDaAlca(a)[a.dataset.c])));
   }
 
-  // parte que só muda quando a referência muda
   function desenharRef() {
     if (ref.tipo === 'janela') {
-      set('prog', { stroke: ref.cor });
+      el('prog').style.stroke = ref.cor;
       el('ticks').innerHTML = Array.from({ length: 11 }, (_, i) =>
-        `<line x1="214" y1="150" x2="236" y2="150" stroke="#111" stroke-width="${i % 5 === 0 ? 2.5 : 1.2}"
+        `<line x1="214" y1="150" x2="236" y2="150" style="stroke:var(--bg)" stroke-width="${i % 5 === 0 ? 2.5 : 1.2}"
           transform="${rot(ref.inicio + ref.dur * i / 10)}"/>`).join('');
     } else {
       set('prog', { 'stroke-dasharray': '0 ' + CJ });
       el('ticks').innerHTML = '';
     }
     el('tituloContador').textContent = ref.titulo;
-    el('tituloUsar').textContent = 'Usei de: ' + ref.nome;
+    el('tituloUsar').textContent = 'USEI DE: ' + ref.nome.toUpperCase();
     el('contador').innerHTML = [1, 5, 10].map(p =>
       `<div class="linha"><span>${p}%</span><span>${fmtMin(minP(p))}</span></div>`).join('');
     el('usar').innerHTML = [1, 5, 10, 20].map(p =>
       `<button class="btn" data-p="${p}"><b>${p}%</b><small>${fmtMin(minP(p))}</small></button>`).join('');
+  }
+
+  // quebra o texto do centro em até 2 linhas pra caber dentro do anel
+  function quebrar(s, max = 24) {
+    const linhas = [''];
+    s.split(' ').forEach(w => {
+      const u = linhas[linhas.length - 1], n = (u + ' ' + w).trim();
+      if (n.length <= max) linhas[linhas.length - 1] = n; else linhas.push(w);
+    });
+    return linhas.slice(0, 2);
   }
 
   function atualizar() {
@@ -349,7 +466,8 @@
     }
 
     el('pct').textContent = ref.pct + '%';
-    el('rotulo').textContent = ref.rotulo;
+    el('rotulo').innerHTML = quebrar(ref.rotulo)
+      .map((t, i) => `<tspan x="150" dy="${i ? 10 : 0}">${t}</tspan>`).join('');
     el('hora').textContent = TESTE !== null
       ? 'teste ' + fmtHoras(h)
       : new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -375,13 +493,16 @@
     a.addEventListener('pointerup', () => { salvarCfg(); construir(); atualizar(); });
   }
 
-  // clique num botão: roda a ação com o botão e refaz o relógio
   const aoClicar = (id, acao) => el(id).addEventListener('click', e => {
     const b = e.target.closest('button');
     if (b) acao(b);
   });
   const refazer = () => { salvarCfg(); construir(); atualizar(); };
 
+  aoClicar('temas', b => {
+    if (b.dataset.t) vis.tema = b.dataset.t; else vis.crt = !vis.crt;
+    aplicarVisual();
+  });
   aoClicar('tipos', b => { tipo = b.dataset.k; manual = { dia: hojeStr(), tipo }; refazer(); });
   aoClicar('toggles', b => { const j = T().janelas[Number(b.dataset.i)]; j.on = !j.on; refazer(); });
   aoClicar('usar', b => registrar(Number(b.dataset.p)));
@@ -392,6 +513,7 @@
     desenharLog();
   };
 
+  aplicarVisual();
   construir();
   desenharLog();
   atualizar();
