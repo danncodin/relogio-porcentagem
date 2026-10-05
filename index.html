@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Relógio de Porcentagem</title>
+  <style>
+    body { margin: 0; min-height: 100vh; background: #111; color: #fff;
+           font-family: sans-serif; display: flex; flex-wrap: wrap;
+           align-items: center; justify-content: center; gap: 32px; padding: 16px;
+           box-sizing: border-box; }
+    .relogio { display: flex; flex-direction: column; align-items: center; gap: 12px; width: min(90vw, 65vh, 480px); }
+    svg { width: 100%; touch-action: none; }
+    .alca { cursor: grab; stroke: #111; stroke-width: 3; }
+    .painel { display: flex; flex-direction: column; gap: 16px; width: 280px; max-width: 90vw; }
+    .linhaBtn { display: flex; gap: 8px; width: 100%; }
+    .linhaBtn button { flex: 1; padding: 9px 4px; border: 1px solid #333; border-radius: 8px;
+                       background: #1a1a1a; color: #aaa; font-size: 14px; cursor: pointer;
+                       font-family: inherit; display: flex; flex-direction: column; gap: 2px; align-items: center; }
+    .linhaBtn button small { font-size: 11px; opacity: .85; }
+    .rotuloBtn { font-size: 11px; color: #666; align-self: flex-start; margin-bottom: -6px; }
+    .card { background: #1a1a1a; border-radius: 10px; padding: 12px 14px; }
+    .card h3 { margin: 0 0 8px; font-size: 13px; color: #888; font-weight: normal; }
+    .linha { display: flex; justify-content: space-between; padding: 3px 0; font-size: 18px; }
+    .linha span:first-child { color: #888; }
+    .legenda { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: #aaa; }
+    .legenda i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+    .num { fill: #777; font-size: 9px; }
+    .num.forte { fill: #fff; font-size: 11px; font-weight: bold; }
+
+    .usar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .usar button { padding: 10px 4px; border: 1px solid #2f6b47; border-radius: 8px;
+                   background: #14261c; color: #4ade80; cursor: pointer; font-family: inherit;
+                   display: flex; flex-direction: column; align-items: center; gap: 2px; }
+    .usar button:active { background: #1d3a29; }
+    .usar b { font-size: 16px; }
+    .usar small { font-size: 11px; color: #8fd7ad; }
+
+    .total { font-size: 14px; color: #aaa; margin-bottom: 8px; }
+    .total b { color: #fff; }
+    #log { max-height: 200px; overflow-y: auto; }
+    .item { display: flex; justify-content: space-between; align-items: center;
+            padding: 5px 0; font-size: 14px; border-top: 1px solid #262626; }
+    .item .hora { color: #888; font-variant-numeric: tabular-nums; }
+    .item button { background: none; border: none; color: #666; cursor: pointer; font-size: 16px; }
+    .item button:hover { color: #f87171; }
+    .vazio { color: #666; font-size: 13px; }
+    #limpar { margin-top: 8px; background: none; border: none; color: #666;
+              font-size: 12px; cursor: pointer; padding: 0; font-family: inherit; }
+    #limpar:hover { color: #f87171; }
+    #hora { font-variant-numeric: tabular-nums; }
+  </style>
+</head>
+<body>
+  <div class="relogio">
+    <svg viewBox="-10 -10 320 320">
+      <!-- anéis e alças são gerados pelo JS conforme o tipo de dia -->
+      <g id="grupo"></g>
+      <g id="numeros"></g>
+
+      <text id="pct" x="150" y="138" text-anchor="middle"
+            dominant-baseline="middle" fill="#fff" font-size="34"></text>
+      <text id="rotulo" x="150" y="164" text-anchor="middle" fill="#888" font-size="11"></text>
+      <text id="hora" x="150" y="186" text-anchor="middle" fill="#ccc" font-size="15"></text>
+    </svg>
+
+    <span class="rotuloBtn">Tipo de dia</span>
+    <div class="linhaBtn" id="tipos"></div>
+    <span class="rotuloBtn">Janelas (liga / desliga)</span>
+    <div class="linhaBtn" id="toggles"></div>
+  </div>
+
+  <div class="painel">
+    <div class="legenda" id="legenda"></div>
+
+    <div class="card">
+      <h3 id="tituloContador"></h3>
+      <div class="linha"><span>1%</span><span id="c1"></span></div>
+      <div class="linha"><span>5%</span><span id="c5"></span></div>
+      <div class="linha"><span>10%</span><span id="c10"></span></div>
+    </div>
+
+    <div class="card">
+      <h3 id="tituloUsar">Usei do meu tempo:</h3>
+      <div class="usar" id="usar"></div>
+    </div>
+
+    <div class="card">
+      <h3>Log de hoje</h3>
+      <div class="total" id="total"></div>
+      <div id="log"></div>
+      <button id="limpar">limpar o log de hoje</button>
+    </div>
+  </div>
+
+<script>
+  const C = 2 * Math.PI * 100;     // anel externo (dia)
+  const CJ = 2 * Math.PI * 76;     // anel interno (janelas)
+  const el = id => document.getElementById(id);
+  const svg = document.querySelector('svg');
+  const mod24 = x => (x % 24 + 24) % 24;
+  const pad = n => String(n).padStart(2, '0');
+
+  const ROT = -142.5; // -90 = meia-noite no topo
+  const TESTE = null; // número (ex.: 19.5) pra simular o horário
+
+  /* ================= CONFIG: tipos de dia ================= */
+  // Cada tipo tem sono, bloco de trabalho (ou null) e janelas.
+  // Tudo é arrastável no anel; o que você arrastar fica salvo.
+  const PADRAO = {
+    trabalho: {
+      nome: 'Trabalho',
+      sono: { dormir: 23, acordar: 6 },
+      trab: { inicio: 10, fim: 17 },          // chute: ajuste arrastando
+      janelas: [
+        { id: 'manha', nome: 'Manhã',              inicio: 7,  fim: 10, cor: '#fbbf24', on: true },
+        { id: 'tarde', nome: 'Depois do trabalho', inicio: 17, fim: 22, cor: '#a78bfa', on: true },
+      ],
+    },
+    fimsemana: {
+      nome: 'Fim de semana',
+      sono: { dormir: 0, acordar: 9 },
+      trab: null,
+      janelas: [
+        { id: 'dia', nome: 'Dia livre', inicio: 9, fim: 24, cor: '#2dd4bf', on: true },
+      ],
+    },
+    livre: {
+      nome: 'Folga',
+      sono: { dormir: 23, acordar: 7 },
+      trab: null,
+      janelas: [
+        { id: 'dia', nome: 'Dia livre', inicio: 7, fim: 23, cor: '#2dd4bf', on: true },
+      ],
+    },
+  };
+  const COR_TRAB = '#64748b';
+
+  const chaveDia = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const hojeStr = () => chaveDia(new Date());
+
+  const CHAVE_CFG = 'relogio-cfg-v2';
+  let cfg = JSON.parse(JSON.stringify(PADRAO));
+  let manual = null;
+  try {
+    const s = JSON.parse(localStorage.getItem(CHAVE_CFG));
+    if (s && s.tipos) { cfg = s.tipos; manual = s.manual || null; }
+  } catch (e) {}
+  const salvarCfg = () => { try { localStorage.setItem(CHAVE_CFG, JSON.stringify({ tipos: cfg, manual })); } catch (e) {} };
+
+  // tipo do dia: automático pelo dia da semana, a menos que eu tenha trocado hoje
+  const dow = new Date().getDay();
+  let tipo = (manual && manual.dia === hojeStr() && cfg[manual.tipo])
+    ? manual.tipo
+    : ((dow === 0 || dow === 6) ? 'fimsemana' : 'trabalho');
+  const T = () => cfg[tipo];
+
+  /* ================= helpers ================= */
+  const durJ = j => mod24(j.fim - j.inicio) || 24;
+  const dentro = (h, ini, fim) => mod24(h - ini) < (mod24(fim - ini) || 24);
+  const fmtMin = m => m < 10 ? m.toFixed(1).replace('.', ',') + ' min' : Math.round(m) + ' min';
+  const fmtHoras = h => {
+    const m = Math.round(h * 60);
+    return m % 60 === 0 ? (m / 60) + 'h' : Math.floor(m / 60) + 'h' + pad(m % 60);
+  };
+  const horaAgora = () => {
+    const d = new Date();
+    return TESTE ?? (d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600);
+  };
+
+  // números 0-23 em volta do relógio
+  (function () {
+    const g = el('numeros');
+    for (let h = 0; h < 24; h++) {
+      const ang = (h * 15 + ROT) * Math.PI / 180;
+      const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      t.setAttribute('x', 150 + 128 * Math.cos(ang));
+      t.setAttribute('y', 150 + 128 * Math.sin(ang));
+      t.setAttribute('text-anchor', 'middle');
+      t.setAttribute('dominant-baseline', 'middle');
+      t.setAttribute('class', h % 6 === 0 ? 'num forte' : 'num');
+      t.textContent = h === 0 ? '0/24' : h;
+      g.appendChild(t);
+    }
+  })();
+
+  /* ================= REFERÊNCIA ================= */
+  // O que o relógio está medindo agora:
+  // - com janelas ligadas: a janela atual (ou a próxima, se estou entre janelas)
+  // - sem nenhuma ligada: o tempo livre do dia (acordado, sem o trabalho) ou o sono
+  function referencia(h) {
+    const t = T();
+    const ons = t.janelas.filter(j => j.on);
+
+    if (ons.length) {
+      const alvo = ons.find(j => dentro(h, j.inicio, j.fim))
+        || ons.slice().sort((a, b) => mod24(a.inicio - h) - mod24(b.inicio - h))[0];
+      const dur = durJ(alvo);
+      const dentroJ = dentro(h, alvo.inicio, alvo.fim);
+      return { tipo: 'janela', chave: `${tipo}|${alvo.id}|${alvo.inicio}|${alvo.fim}`,
+               nome: alvo.nome, cor: alvo.cor, inicio: alvo.inicio, fim: alvo.fim, dur,
+               passou: dentroJ ? mod24(h - alvo.inicio) : -mod24(alvo.inicio - h) };
+    }
+
+    const { dormir, acordar } = t.sono;
+    const durSono = mod24(acordar - dormir) || 24;
+    if (dentro(h, dormir, acordar)) {
+      return { tipo: 'dia', chave: `${tipo}|sono|${dormir}|${acordar}`, nome: 'Sono',
+               dur: durSono, passou: mod24(h - dormir) };
+    }
+
+    // tempo livre = acordado menos trabalho, contado minuto a minuto
+    const ehLivre = m => !dentro(m / 60, dormir, acordar) &&
+                         !(t.trab && dentro(m / 60, t.trab.inicio, t.trab.fim));
+    const alvoMin = mod24(h - acordar) * 60;
+    let total = 0, feito = 0;
+    for (let k = 0; k < 1440; k++) {
+      if (ehLivre(mod24(acordar + k / 60) * 60)) { total++; if (k < alvoMin) feito++; }
+    }
+    return { tipo: 'dia', chave: `${tipo}|livre|${total}`, nome: 'Tempo livre',
+             dur: total / 60, passou: feito / 60,
+             trabalhando: !!(t.trab && dentro(h, t.trab.inicio, t.trab.fim)) };
+  }
+
+  let ref = referencia(horaAgora());
+  let ultimaChave = null;
+
+  /* ================= LOG ================= */
+  const PORCENTAGENS = [1, 5, 10, 20];
+  const CHAVE = 'relogio-log';
+  let log = [];
+  try { log = JSON.parse(localStorage.getItem(CHAVE)) || []; } catch (e) {}
+  const salvarLog = () => { try { localStorage.setItem(CHAVE, JSON.stringify(log)); } catch (e) {} };
+
+  function registrar(pct) {
+    const agora = new Date();
+    log.push({ id: agora.getTime(), quando: agora.toISOString(), pct,
+               min: ref.dur * 60 * pct / 100, nome: ref.nome, tipo });
+    salvarLog();
+    desenharLog();
+  }
+
+  function desenharBotoes() {
+    el('tituloUsar').textContent = 'Usei de: ' + ref.nome;
+    el('usar').innerHTML = PORCENTAGENS.map(p =>
+      `<button data-p="${p}"><b>${p}%</b><small>${fmtMin(ref.dur * 60 * p / 100)}</small></button>`
+    ).join('');
+  }
+  el('usar').addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (b) registrar(Number(b.dataset.p));
+  });
+
+  function desenharLog() {
+    const hoje = hojeStr();
+    const doDia = log.filter(x => chaveDia(new Date(x.quando)) === hoje);
+    const totalMin = doDia.reduce((s, x) => s + x.min, 0);
+    const porNome = {};
+    doDia.forEach(x => { const n = x.nome || 'Outro'; porNome[n] = (porNome[n] || 0) + x.pct; });
+
+    el('total').innerHTML = doDia.length
+      ? `Total: <b>${fmtMin(totalMin)}</b>` +
+        Object.keys(porNome).map(n => ` · ${n} <b>${porNome[n]}%</b>`).join('')
+      : '';
+
+    el('log').innerHTML = doDia.length
+      ? doDia.slice().reverse().map(x => {
+          const d = new Date(x.quando);
+          return `<div class="item">
+            <span><span class="hora">${pad(d.getHours())}:${pad(d.getMinutes())}</span>
+              &nbsp; ${x.nome || ''} · ${x.pct}% → ${fmtMin(x.min)}</span>
+            <button data-id="${x.id}" title="apagar">×</button>
+          </div>`;
+        }).join('')
+      : '<div class="vazio">Nada registrado ainda.</div>';
+  }
+  el('log').addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    log = log.filter(x => x.id !== Number(b.dataset.id));
+    salvarLog();
+    desenharLog();
+  });
+  el('limpar').onclick = () => {
+    const hoje = hojeStr();
+    log = log.filter(x => chaveDia(new Date(x.quando)) !== hoje);
+    salvarLog();
+    desenharLog();
+  };
+
+  /* ================= RELÓGIO ================= */
+  function arco(circ, id, inicio, dur) {
+    const c = el(id);
+    if (!c) return;
+    const a = dur / 24 * circ;
+    c.setAttribute('stroke-dasharray', `${a} ${circ - a}`);
+    c.setAttribute('stroke-dashoffset', -inicio / 24 * circ);
+  }
+
+  // objeto que uma alça controla
+  function alvoDaAlca(a) {
+    const t = T();
+    if (a.dataset.g === 'sono') return t.sono;
+    if (a.dataset.g === 'trab') return t.trab;
+    return t.janelas[Number(a.dataset.i)];
+  }
+
+  // estrutura: só refaz quando troca o tipo ou liga/desliga janela
+  function construir() {
+    const t = T();
+    let s = `<circle cx="150" cy="150" r="100" fill="none" stroke="#222" stroke-width="20" />
+             <circle cx="150" cy="150" r="100" fill="none" stroke="#4ade80" stroke-width="20" />
+             <circle id="a-sono" cx="150" cy="150" r="100" fill="none" stroke="#3b82f6" stroke-width="20" />`;
+    if (t.trab) s += `<circle id="a-trab" cx="150" cy="150" r="100" fill="none" stroke="${COR_TRAB}" stroke-width="20" />`;
+
+    s += `<circle cx="150" cy="150" r="76" fill="none" stroke="#1c1c1c" stroke-width="16" />`;
+    t.janelas.forEach((j, i) => {
+      s += `<circle id="j-${i}" cx="150" cy="150" r="76" fill="none" stroke="${j.cor}" stroke-width="16" />`;
+    });
+    s += `<circle id="prog" cx="150" cy="150" r="76" fill="none" stroke-width="16" />
+          <g id="ticks"></g>
+          <g id="agora">
+            <line x1="212" y1="150" x2="262" y2="150" stroke="#fff" stroke-width="2.5" />
+            <circle cx="250" cy="150" r="7" fill="#fff" />
+          </g>`;
+
+    // alças arrastáveis
+    const alca = (g, i, campo, r, cor, raio) =>
+      `<circle class="alca" data-g="${g}" data-i="${i}" data-c="${campo}"
+               cx="${150 + r}" cy="150" r="${raio}" fill="${cor}" />`;
+    s += alca('sono', 0, 'dormir', 100, '#3b82f6', 11) + alca('sono', 0, 'acordar', 100, '#3b82f6', 11);
+    if (t.trab) s += alca('trab', 0, 'inicio', 100, COR_TRAB, 11) + alca('trab', 0, 'fim', 100, COR_TRAB, 11);
+    t.janelas.forEach((j, i) => {
+      if (j.on) s += alca('j', i, 'inicio', 76, j.cor, 8) + alca('j', i, 'fim', 76, j.cor, 8);
+    });
+
+    el('grupo').setAttribute('transform', `rotate(${ROT} 150 150)`);
+    el('grupo').innerHTML = s;
+    document.querySelectorAll('.alca').forEach(arrastavel);
+
+    // botões de tipo de dia
+    el('tipos').innerHTML = Object.keys(cfg).map(k =>
+      `<button data-k="${k}" style="${k === tipo ? 'background:#fff;color:#111;border-color:#fff' : ''}">${cfg[k].nome}</button>`
+    ).join('');
+
+    // botões liga/desliga de cada janela do tipo
+    el('toggles').innerHTML = t.janelas.map((j, i) =>
+      `<button data-i="${i}" style="${j.on ? `background:${j.cor};color:#111;border-color:${j.cor}` : ''}">
+         <span>${j.nome}</span>
+         <small>${pad(j.inicio)} → ${pad(j.fim)} · ${j.on ? 'ligada' : 'desligada'}</small>
+       </button>`
+    ).join('');
+
+    // legenda
+    el('legenda').innerHTML =
+      `<span><i style="background:#3b82f6"></i>Sono</span>` +
+      (t.trab ? `<span><i style="background:${COR_TRAB}"></i>Trabalho</span>` : '') +
+      `<span><i style="background:#4ade80"></i>Livre</span>` +
+      t.janelas.map(j => `<span><i style="background:${j.cor}"></i>${j.nome}</span>`).join('');
+
+    posicionar();
+    ultimaChave = null;
+  }
+
+  // posições: arcos e alças (roda também durante o arrastar)
+  function posicionar() {
+    const t = T();
+    arco(C, 'a-sono', t.sono.dormir, mod24(t.sono.acordar - t.sono.dormir) || 24);
+    if (t.trab) arco(C, 'a-trab', t.trab.inicio, durJ(t.trab));
+    t.janelas.forEach((j, i) => {
+      arco(CJ, 'j-' + i, j.inicio, durJ(j));
+      el('j-' + i).setAttribute('opacity', j.on ? 0.35 : 0.08);
+    });
+    document.querySelectorAll('.alca').forEach(a => {
+      const v = alvoDaAlca(a)[a.dataset.c];
+      a.setAttribute('transform', `rotate(${v * 15} 150 150)`);
+    });
+  }
+
+  // parte que muda quando a referência muda
+  function desenharRef() {
+    if (ref.tipo === 'janela') {
+      el('prog').setAttribute('stroke', ref.cor);
+      let s = '';
+      for (let i = 0; i <= 10; i++) {
+        const a = (ref.inicio + ref.dur * i / 10) * 15;
+        s += `<line x1="214" y1="150" x2="236" y2="150" stroke="#111"
+               stroke-width="${i % 5 === 0 ? 2.5 : 1.2}" transform="rotate(${a} 150 150)"/>`;
+      }
+      el('ticks').innerHTML = s;
+    } else {
+      el('prog').setAttribute('stroke-dasharray', '0 ' + CJ);
+      el('ticks').innerHTML = '';
+    }
+    desenharBotoes();
+  }
+
+  function atualizar() {
+    const d = new Date();
+    const h = horaAgora();
+    ref = referencia(h);
+
+    if (ref.chave !== ultimaChave) {
+      ultimaChave = ref.chave;
+      desenharRef();
+    }
+
+    el('agora').setAttribute('transform', `rotate(${h * 15} 150 150)`);
+
+    if (ref.tipo === 'janela') {
+      const feito = Math.min(Math.max(ref.passou, 0), ref.dur);
+      const a = feito / 24 * CJ;
+      el('prog').setAttribute('stroke-dasharray', `${a} ${CJ - a}`);
+      el('prog').setAttribute('stroke-dashoffset', -ref.inicio / 24 * CJ);
+
+      if (ref.passou >= 0) {
+        el('pct').textContent = Math.round(ref.passou / ref.dur * 100) + '%';
+        el('rotulo').textContent = 'da janela ' + ref.nome.toLowerCase();
+      } else {
+        el('pct').textContent = '0%';
+        el('rotulo').textContent = ref.nome.toLowerCase() + ' começa em ' + fmtHoras(-ref.passou);
+      }
+      el('tituloContador').textContent =
+        `${ref.nome}: ${pad(Math.floor(ref.inicio))}–${pad(Math.floor(ref.fim))} (${fmtHoras(ref.dur)})`;
+    } else {
+      el('pct').textContent = Math.round(ref.passou / ref.dur * 100) + '%';
+      el('rotulo').textContent = ref.nome === 'Sono' ? 'do sono'
+        : (ref.trabalhando ? 'do tempo livre · em trabalho' : 'do tempo livre do dia');
+      el('tituloContador').textContent = `${ref.nome} (${fmtHoras(ref.dur)})`;
+    }
+
+    el('hora').textContent = TESTE !== null
+      ? 'teste ' + fmtHoras(h)
+      : d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+    el('c1').textContent = fmtMin(ref.dur * 60 * 0.01);
+    el('c5').textContent = fmtMin(ref.dur * 60 * 0.05);
+    el('c10').textContent = fmtMin(ref.dur * 60 * 0.10);
+  }
+
+  /* ================= INTERAÇÃO ================= */
+  function horarioDoPonteiro(e) {
+    const r = svg.getBoundingClientRect();
+    const dx = e.clientX - (r.left + r.width / 2);
+    const dy = e.clientY - (r.top + r.height / 2);
+    let graus = Math.atan2(dy, dx) * 180 / Math.PI - ROT;
+    graus = (graus + 360) % 360;
+    return mod24(Math.round(graus / 15 * 4) / 4); // trava de 15 em 15 min
+  }
+
+  function arrastavel(a) {
+    a.addEventListener('pointerdown', e => a.setPointerCapture(e.pointerId));
+    a.addEventListener('pointermove', e => {
+      if (!a.hasPointerCapture(e.pointerId)) return;
+      alvoDaAlca(a)[a.dataset.c] = horarioDoPonteiro(e);
+      posicionar();
+      atualizar();
+    });
+    a.addEventListener('pointerup', () => { salvarCfg(); construir(); atualizar(); });
+  }
+
+  el('tipos').addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    tipo = b.dataset.k;
+    manual = { dia: hojeStr(), tipo };
+    salvarCfg();
+    construir();
+    atualizar();
+  });
+
+  el('toggles').addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    const j = T().janelas[Number(b.dataset.i)];
+    j.on = !j.on;
+    salvarCfg();
+    construir();
+    atualizar();
+  });
+
+  construir();
+  desenharLog();
+  atualizar();
+  setInterval(atualizar, 1000);
+</script>
+</body>
+</html>
